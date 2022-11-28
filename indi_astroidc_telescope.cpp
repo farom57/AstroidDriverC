@@ -63,7 +63,8 @@ bool Astroid::initProperties()
     setDriverInterface(TELESCOPE_INTERFACE | GUIDER_INTERFACE); //FOCUSER_INTERFACE | AUX_INTERFACE | LIGHTBOX_INTERFACE);
     setDefaultPollingPeriod(250);
 
-
+    serialConnection->setDefaultBaudRate(Connection::Serial::B_9600);
+    tty_set_debug(true);
 
     return true;
 }
@@ -114,6 +115,18 @@ bool Astroid::Abort()
 ***************************************************************************************/
 bool Astroid::ReadScopeStatus()
 {
+    char buf[200];
+    int nbytes = 0, rc = 0;
+
+    if (!isConnected()){
+        LOG_ERROR("Error not connected");
+    }
+    if ((rc = tty_read_section (PortFD, buf, 0x55, 1, &nbytes)) != TTY_OK)
+    {
+        LOGF_ERROR("Error reading. Result: %d nbytes: %d PortFD: %d", rc, nbytes, PortFD);
+        return false;
+    }
+
     static struct timeval ltv
     {
         0, 0
@@ -234,6 +247,8 @@ bool Astroid::updateProperties()
 
 bool Astroid::Connect()
 {
+    LOG_INFO("Connecting");
+    Telescope::Connect();
     LOG_INFO("Astroid is online.");
     SetTimer(getCurrentPollingPeriod());
 
@@ -242,6 +257,8 @@ bool Astroid::Connect()
 
 bool Astroid::Disconnect()
 {
+    LOG_INFO("Disconnecting");
+    Telescope::Disconnect();
     LOG_INFO("Astroid is offline.");
     return true;
 }
@@ -432,6 +449,6 @@ bool Astroid::sendCommand(const char *cmd)
 
 bool Astroid::Handshake()
 {
-
+    LOGF_INFO("Handshake. PortFD: %d",PortFD);
     return true;
 }
