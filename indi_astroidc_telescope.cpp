@@ -59,12 +59,12 @@ bool Astroid::initProperties()
     // Lightbox
     //initLightBoxProperties(getDeviceName(), "Aux");
 
-    addAuxControls();
+    addDebugControl();
     setDriverInterface(TELESCOPE_INTERFACE | GUIDER_INTERFACE); //FOCUSER_INTERFACE | AUX_INTERFACE | LIGHTBOX_INTERFACE);
     setDefaultPollingPeriod(250);
 
     serialConnection->setDefaultBaudRate(Connection::Serial::B_9600);
-    tty_set_debug(true);
+    //tty_set_debug(true);
 
     return true;
 }
@@ -121,10 +121,29 @@ bool Astroid::ReadScopeStatus()
     if (!isConnected()){
         LOG_ERROR("Error not connected");
     }
-    if ((rc = tty_read_section (PortFD, buf, 0x55, 1, &nbytes)) != TTY_OK)
+
+    if ((rc = tty_read_section_expanded (PortFD, buf, 0x55,0, 100000, &nbytes)) != TTY_OK)
     {
-        LOGF_ERROR("Error reading. Result: %d nbytes: %d PortFD: %d", rc, nbytes, PortFD);
+        LOGF_ERROR("Preamble not found, result: %d", rc);
         return false;
+    }
+    LOGF_INFO("discarded %d bytes", nbytes);
+
+    if ((rc = tty_read_expanded (PortFD, buf, 56, 0, 5000, &nbytes)) != TTY_OK)
+    {
+        LOGF_ERROR("Error reading. Result: %d nbytes: %d", rc, nbytes, PortFD);
+        return false;
+    }else{
+        LOGF_INFO("Read %d bytes", nbytes);
+        uint32_t ms_count = (buf[0]<<24) + (buf[1] << 16) + (buf[2] << 8) + buf[3];
+        uint32_t step_ha = (buf[4]<<24) + (buf[5] << 16) + (buf[6] << 8) + buf[7];
+        uint32_t step_de = (buf[8]<<24) + (buf[9] << 16) + (buf[10] << 8) + buf[11];
+        LOGF_INFO("ms_count: %d, step_ha: %d, step_de", ms_count, step_ha, step_de);
+        float ustep_ha = *(float*)(buf+12);
+        uint32_t test = (buf[12]<<24) + (buf[13] << 16) + (buf[14] << 8) + buf[15];
+        float ustep_ha2 = *(float*)(&test);
+        LOGF_INFO("ustep_ha: %f ustep_ha2: %f test:%d",ustep_ha, ustep_ha2, test);
+
     }
 
     static struct timeval ltv
