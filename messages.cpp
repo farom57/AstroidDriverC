@@ -63,6 +63,14 @@ bool Status_message::verify(char const *buf){
 }
 
 
+double Status_message::getDE(){
+    return (double) step_de + (double)ustep_de/1024.;
+}
+
+double Status_message::getHA(){
+    return (double) step_ha + (double)ustep_ha/1024.;
+}
+
 
 Cmd_message::Cmd_message(){
     speed_ha = 0;

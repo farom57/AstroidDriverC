@@ -27,6 +27,9 @@ class Status_message{
         Status_message(char const *buf);
         static bool verify(char const *buf);
 
+        double getDE();
+        double getHA();
+
 };
 
 // Message from the driver to the telescope

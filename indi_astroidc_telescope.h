@@ -1,97 +1,176 @@
-/*
-   INDI Developers Manual
-   Tutorial #2
+/*******************************************************************************
+ Copyright(c) 2019 Jasem Mutlaq. All rights reserved.
 
-   "Simple Telescope Driver"
-
-   We develop a simple telescope simulator.
-
-   Refer to README, which contains instruction on how to build this driver, and use it
-   with an INDI-compatible client.
-
-*/
-
-/** \file simplescope.h
-    \brief Construct a basic INDI telescope device that simulates GOTO commands.
-    \author Jasem Mutlaq
-
-    \example simplescope.h
-    A simple GOTO telescope that simulator slewing operation.
-*/
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Library General Public
+ License version 2 as published by the Free Software Foundation.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Library General Public License for more details.
+ .
+ You should have received a copy of the GNU Library General Public License
+ along with this library; see the file COPYING.LIB.  If not, write to
+ the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ Boston, MA 02110-1301, USA.
+*******************************************************************************/
 
 #pragma once
 
-#include "inditelescope.h"
 #include "indiguiderinterface.h"
-#include "indifocuserinterface.h"
-#include "indilightboxinterface.h"
+#include "inditelescope.h"
 #include "messages.h"
+#include "libastro.h"
 
-#define GOTO_STOP_DISTANCE = 1. / 60.;
-#define GOTO_SLOW_DISTANCE = 15. / 60.;
-#define MAX_SPEED = 623*2;
-#define GOTO_SPEED = 400;
-#define GOTO_ACC_T = 5;
-#define GOTO_SLOW_SPEED = GOTO_SPEED/10;
+#define STEP_BY_TURN (50. * 3. * 144.)
+#define GOTO_STOP_DISTANCE (1. / 60.)
+#define GOTO_SLOW_DISTANCE (15. / 60.)
+#define MAX_SPEED (623*2)
+#define GOTO_SPEED 400
+#define GOTO_ACC_T 5
+#define GOTO_SLOW_SPEED GOTO_SPEED/10
 
-namespace Connection
-{
-    class Serial;
-}
-
-
-class Astroid : public INDI::Telescope, public INDI::GuiderInterface//, public INDI::FocuserInterface, public INDI::LightBoxInterface
+/**
+ * @brief The MountDriver class provides a simple example for development of a new
+ * mount driver. Modify the driver to fit your needs.
+ *
+ * It supports the following features:
+ * + Sideral and Custom Tracking rates.
+ * + Goto & Sync
+ * + NWSE Hand controller direciton key slew.
+ * + Tracking On/Off.
+ * + Parking & Unparking with custom parking positions.
+ * + Setting Time & Location.
+ *
+ * On startup and by default the mount shall point to the celestial pole.
+ *
+ * @author Jasem Mutlaq
+ */
+class Astroid : public INDI::Telescope, public INDI::GuiderInterface
 {
     public:
-
-
-
         Astroid();
+
         virtual const char *getDefaultName() override;
-        virtual bool Connect() override;
-        virtual bool Disconnect() override;
         virtual bool initProperties() override;
         virtual bool updateProperties() override;
 
-        virtual void ISGetProperties(const char *dev) override;
         virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
-        virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
-
-
-
-
 
     protected:
-        bool Handshake() override;
+        ///////////////////////////////////////////////////////////////////////////////
+        /// Communication
+        ///////////////////////////////////////////////////////////////////////////////
+        /**
+         * @brief Handshake Attempt communication with the mount.
+         * @return true if successful, false otherwise.
+         */
+        virtual bool Handshake() override;
 
-        // Telescope specific functions
+        /**
+         * @brief ReadScopeStatus Query the mount status, coordinate, any status indicators, pier side..etc.
+         * @return True if query is successful, false otherwise.
+         */
         virtual bool ReadScopeStatus() override;
-        virtual bool Goto(double, double) override;
-        virtual bool MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command) override;
-        virtual bool MoveWE(INDI_DIR_WE dir, TelescopeMotionCommand command) override;
-        virtual bool Abort() override;
-        virtual bool SetTrackMode(uint8_t mode) override;
-        virtual bool SetTrackEnabled(bool enabled) override;
-        virtual bool SetTrackRate(double raRate, double deRate) override;
-        virtual bool Sync(double ra, double dec) override;
 
-        // Guider functions
+
+        Status_message last_status;
+        Cmd_message command;
+
+        ///////////////////////////////////////////////////////////////////////////////
+        /// Motions commands.
+        ///////////////////////////////////////////////////////////////////////////////
+
+        /**
+         * @brief MoveNS Start or Stop motion in the North/South DEC Axis.
+         * @param dir Direction
+         * @param command Start or Stop
+         * @return true if successful, false otherwise.
+         */
+        virtual bool MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command) override;
+
+        /**
+         * @brief MoveWE Start or Stop motion in the East/West RA Axis.
+         * @param dir Direction
+         * @param command Start or Stop
+         * @return true if successful, false otherwise.
+         */
+        virtual bool MoveWE(INDI_DIR_WE dir, TelescopeMotionCommand command) override;
+
+        /**
+         * @brief Abort Abort all motion. If tracking, stop it.
+         * @return True if successful, false otherwise.
+         */
+        virtual bool Abort() override;
+
+        ///////////////////////////////////////////////////////////////////////////////
+        /// Pulse Guiding Commands
+        ///////////////////////////////////////////////////////////////////////////////
         virtual IPState GuideNorth(uint32_t ms) override;
         virtual IPState GuideSouth(uint32_t ms) override;
         virtual IPState GuideEast(uint32_t ms) override;
         virtual IPState GuideWest(uint32_t ms) override;
 
+        ///////////////////////////////////////////////////////////////////////////////
+        /// Tracking Commands
+        ///////////////////////////////////////////////////////////////////////////////
+        virtual bool SetTrackMode(uint8_t mode) override;
+        virtual bool SetTrackEnabled(bool enabled) override;
+        virtual bool SetTrackRate(double raRate, double deRate) override;
 
-        // Focuser functions
+        ///////////////////////////////////////////////////////////////////////////////
+        /// GOTO & Sync commands
+        ///////////////////////////////////////////////////////////////////////////////
+        virtual bool Goto(double RA, double DE) override;
+        virtual bool Sync(double RA, double DE) override;
 
-        // LightBox functions
 
-        // comm
-        Status_message last_status;
-        Cmd_message command;
+        ///////////////////////////////////////////////////////////////////////////////
+        /// Parking commands
+        ///////////////////////////////////////////////////////////////////////////////
+        virtual bool Park() override;
+        virtual bool UnPark() override;
+        virtual bool SetCurrentPark() override;
+        virtual bool SetDefaultPark() override;
+
+        ///////////////////////////////////////////////////////////////////////////////
+        /// Utility Functions
+        ///////////////////////////////////////////////////////////////////////////////
+        /**
+         * @brief sendCommand Send a string command to device.
+         * @param cmd Command to be sent. Can be either NULL TERMINATED or just byte buffer.
+         * @param res If not nullptr, the function will wait for a response from the device. If nullptr, it returns true immediately
+         * after the command is successfully sent.
+         * @param cmd_len if -1, it is assumed that the @a cmd is a null-terminated string. Otherwise, it would write @a cmd_len bytes from
+         * the @a cmd buffer.
+         * @param res_len if -1 and if @a res is not nullptr, the function will read until it detects the default delimeter DRIVER_STOP_CHAR
+         *  up to DRIVER_LEN length. Otherwise, the function will read @a res_len from the device and store it in @a res.
+         * @return True if successful, false otherwise.
+         */
+        bool sendCommand(const char * cmd, char * res = nullptr, int cmd_len = -1, int res_len = -1);
+
+        /**
+         * @brief hexDump Helper function to print non-string commands to the logger so it is easier to debug
+         * @param buf buffer to format the command into hex strings.
+         * @param data the command
+         * @param size length of the command in bytes.
+         * @note This is called internally by sendCommand, no need to call it directly.
+         */
+        void hexDump(char * buf, const char * data, int size);
+
+
 
     private:
+        ///////////////////////////////////////////////////////////////////////////////
+        /// Additional Properties
+        ///////////////////////////////////////////////////////////////////////////////
+        INumber GuideRateN[2];
+        INumberVectorProperty GuideRateNP;
 
+        ///////////////////////////////////////////////////////////////////////////////
+        /// Class Variables
+        ///////////////////////////////////////////////////////////////////////////////
         double sync_coord_HA;
         double sync_step_HA;
         double sync_coord_DE;
@@ -110,38 +189,11 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface//, public I
         double power_DE = 1;
         double power_FOCUS = 1;
 
-
-
-
-
-
-
-
-
-
-
-
-
-        double currentRA {0};
-        double currentDEC {90};
-        double targetRA {0};
-        double targetDEC {0};
-
-        int mcRate = 0;
-
-        bool guidingNS = false;
-        bool guidingEW = false;
-
-        // slew rate, degrees/s
-        static const uint8_t SLEW_RATE = 3;
-
-        INumber GuideRateN[2];
-        INumberVectorProperty GuideRateNP;
-
-
-
-
+        /////////////////////////////////////////////////////////////////////////////
+        /// Static Helper Values
+        /////////////////////////////////////////////////////////////////////////////
+        static double mod360(double x);
+        static double mod24(double x);
 
 
 };
-
