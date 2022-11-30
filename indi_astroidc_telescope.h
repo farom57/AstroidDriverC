@@ -25,7 +25,14 @@
 #include "indiguiderinterface.h"
 #include "indifocuserinterface.h"
 #include "indilightboxinterface.h"
+#include "messages.h"
 
+#define GOTO_STOP_DISTANCE = 1. / 60.;
+#define GOTO_SLOW_DISTANCE = 15. / 60.;
+#define MAX_SPEED = 623*2;
+#define GOTO_SPEED = 400;
+#define GOTO_ACC_T = 5;
+#define GOTO_SLOW_SPEED = GOTO_SPEED/10;
 
 namespace Connection
 {
@@ -36,6 +43,9 @@ namespace Connection
 class Astroid : public INDI::Telescope, public INDI::GuiderInterface//, public INDI::FocuserInterface, public INDI::LightBoxInterface
 {
     public:
+
+
+
         Astroid();
         virtual const char *getDefaultName() override;
         virtual bool Connect() override;
@@ -46,6 +56,7 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface//, public I
         virtual void ISGetProperties(const char *dev) override;
         virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
         virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
+
 
 
 
@@ -75,7 +86,42 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface//, public I
 
         // LightBox functions
 
+        // comm
+        Status_message last_status;
+        Cmd_message command;
+
     private:
+
+        double sync_coord_HA;
+        double sync_step_HA;
+        double sync_coord_DE;
+        double sync_step_DE;
+        double goto_target_RA;
+        double goto_target_DE;
+        bool goto_active;
+
+        double motion_speed;
+        double track_speed_HA = 1;
+        double track_speed_DE = 0;
+        double slew_DE_speed = 0;
+        double slew_RA_speed = 0;
+        double slew_FOCUS_speed = 0;
+        double power_HA = 1;
+        double power_DE = 1;
+        double power_FOCUS = 1;
+
+
+
+
+
+
+
+
+
+
+
+
+
         double currentRA {0};
         double currentDEC {90};
         double targetRA {0};
@@ -92,8 +138,7 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface//, public I
         INumber GuideRateN[2];
         INumberVectorProperty GuideRateNP;
 
-        // Serial
-        bool sendCommand(const char *cmd);
+
 
 
 

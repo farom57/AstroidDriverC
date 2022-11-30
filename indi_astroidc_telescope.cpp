@@ -110,6 +110,7 @@ bool Astroid::Abort()
     return true;
 }
 
+
 /**************************************************************************************
 ** Client is asking us to report telescope status
 ***************************************************************************************/
@@ -118,33 +119,40 @@ bool Astroid::ReadScopeStatus()
     char buf[200];
     int nbytes = 0, rc = 0;
 
-    if (!isConnected()){
+    /*if (!isConnected()){
         LOG_ERROR("Error not connected");
-    }
+
+    }*/
 
     if ((rc = tty_read_section_expanded (PortFD, buf, 0x55,0, 100000, &nbytes)) != TTY_OK)
     {
-        LOGF_ERROR("Preamble not found, result: %d", rc);
+        LOGF_WARN("Preamble not found, result: %d", rc);
         return false;
     }
-    LOGF_INFO("discarded %d bytes", nbytes);
+    LOGF_DEBUG("discarded %d bytes", nbytes);
 
-    if ((rc = tty_read_expanded (PortFD, buf, 56, 0, 5000, &nbytes)) != TTY_OK)
+    if ((rc = tty_read_expanded (PortFD, buf, Status_message::SIZE, 0, 5000, &nbytes)) != TTY_OK)
     {
-        LOGF_ERROR("Error reading. Result: %d nbytes: %d", rc, nbytes, PortFD);
+        LOGF_WARN("Error reading. Result: %d nbytes: %d", rc, nbytes, PortFD);
         return false;
-    }else{
-        LOGF_INFO("Read %d bytes", nbytes);
-        uint32_t ms_count = (buf[0]<<24) + (buf[1] << 16) + (buf[2] << 8) + buf[3];
-        uint32_t step_ha = (buf[4]<<24) + (buf[5] << 16) + (buf[6] << 8) + buf[7];
-        uint32_t step_de = (buf[8]<<24) + (buf[9] << 16) + (buf[10] << 8) + buf[11];
-        LOGF_INFO("ms_count: %d, step_ha: %d, step_de", ms_count, step_ha, step_de);
-        float ustep_ha = *(float*)(buf+12);
-        uint32_t test = (buf[12]<<24) + (buf[13] << 16) + (buf[14] << 8) + buf[15];
-        float ustep_ha2 = *(float*)(&test);
-        LOGF_INFO("ustep_ha: %f ustep_ha2: %f test:%d",ustep_ha, ustep_ha2, test);
-
     }
+
+    if(!Status_message::verify(buf)){
+        uint8_t checksum_calculated = 0;
+        for(int i = 0; i < 55; i++){
+            checksum_calculated += buf[i];
+        }
+        LOGF_WARN("Message NOK, checksum: received=%02X calculated=%02X",buf[55],checksum_calculated);
+        return false;
+    }
+
+    //LOG_DEBUG("Message OK");
+    LOG_INFO("Message OK");
+    last_status = Status_message(buf);
+
+
+
+    /*
 
     static struct timeval ltv
     {
@@ -157,7 +165,7 @@ bool Astroid::ReadScopeStatus()
     double dt = 0, da_ra = 0, da_dec = 0, dx = 0, dy = 0;
     int nlocked;
 
-    /* update elapsed time since last poll, don't presume exactly POLLMS */
+    // update elapsed time since last poll, don't presume exactly POLLMS
     gettimeofday(&tv, nullptr);
 
     if (ltv.tv_sec == 0 && ltv.tv_usec == 0)
@@ -170,7 +178,7 @@ bool Astroid::ReadScopeStatus()
     da_ra  = SLEW_RATE * dt;
     da_dec = SLEW_RATE * dt;
 
-    /* Process per current state. We check the state of EQUATORIAL_EOD_COORDS_REQUEST and act acoordingly */
+    // Process per current state. We check the state of EQUATORIAL_EOD_COORDS_REQUEST and act acoordingly
     switch (TrackState)
     {
         case SCOPE_SLEWING:
@@ -232,6 +240,8 @@ bool Astroid::ReadScopeStatus()
     LOGF_DEBUG("Current RA: %s Current DEC: %s", RAStr, DecStr);
 
     NewRaDec(currentRA, currentDEC);
+    */
+
     return true;
 }
 
@@ -266,20 +276,12 @@ bool Astroid::updateProperties()
 
 bool Astroid::Connect()
 {
-    LOG_INFO("Connecting");
-    Telescope::Connect();
-    LOG_INFO("Astroid is online.");
-    SetTimer(getCurrentPollingPeriod());
-
-    return true;
+    return Telescope::Connect();
 }
 
 bool Astroid::Disconnect()
 {
-    LOG_INFO("Disconnecting");
-    Telescope::Disconnect();
-    LOG_INFO("Astroid is offline.");
-    return true;
+    return Telescope::Disconnect();
 }
 
 bool Astroid::Sync(double ra, double dec)
@@ -425,9 +427,9 @@ bool Astroid::saveConfigItems(FILE *fp)
 }
 */
 
-bool Astroid::sendCommand(const char *cmd)
+/*bool Astroid::sendCommand(const char *cmd)
 {
-    /*int nbytes_read = 0, nbytes_written = 0, tty_rc = 0;
+    int nbytes_read = 0, nbytes_written = 0, tty_rc = 0;
     char res[8] = {0};
     LOGF_DEBUG("CMD <%s>", cmd);
 
@@ -461,13 +463,26 @@ bool Astroid::sendCommand(const char *cmd)
 
     res[nbytes_read - 1] = '\0';
     LOGF_DEBUG("RES <%s>", res);
-    */
+    *
 
     return true;
-}
+}*/
 
 bool Astroid::Handshake()
 {
-    LOGF_INFO("Handshake. PortFD: %d",PortFD);
+    LOG_INFO("Handshake");
     return true;
+    int err_count = 0;
+    while(err_count < 5){
+        LOGF_INFO("Attempt: %d", err_count+1);
+        if(Astroid::ReadScopeStatus()){
+            LOG_INFO("Connection sucessful");
+            return true;
+        }
+        err_count++;
+    }
+
+    LOG_ERROR("Connection error");
+    return false;
+
 }

@@ -42,6 +42,7 @@ include(CMakeCommon)
 add_executable(
     indi_astroidc_telescope
     indi_astroidc_telescope.cpp
+    messages.cpp
 )
 
 # and link it to these libraries
