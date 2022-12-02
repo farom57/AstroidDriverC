@@ -1,12 +1,12 @@
 #include "messages.h"
 
 float char2float(char const *buf){
-    uint32_t tmp = (buf[12]<<24) + (buf[13] << 16) + (buf[14] << 8) + buf[15];
+    uint32_t tmp = ((uint8_t)buf[0]<<24) + ((uint8_t)buf[1] << 16) + ((uint8_t)buf[2] << 8) + (uint8_t)buf[3];
     return *(float*)(&tmp);
 }
 
 int32_t char2long(char const *buf){
-    return (buf[0]<<24) + (buf[1] << 16) + (buf[2] << 8) + buf[3];
+    return ((uint8_t)buf[0]<<24) + ((uint8_t)buf[1] << 16) + ((uint8_t)buf[2] << 8) + (uint8_t)buf[3];
 }
 
 uint16_t char2uint(char const *buf){
@@ -34,7 +34,31 @@ Status_message::Status_message(){
     checksum = 0;
 }
 
-Status_message::Status_message(char const *buf){
+bool Status_message::set_buf(char const *buf){
+    // example: 00 0C 96 66 00 00 00 53 00 00 03 BF 44 7C 00 00 44 14 00 00 3F 80 00 00 00 00 00 00 3F 80 00 00 3F 80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 72
+    /*ms_count = 00 0C 96 66
+    step_ha = 00 00 00 53
+    step_de = 00 00 03 BF
+    ustep_ha = 44 7C 00 00;
+    ustep_de = 44 14 00 00
+    move_speed_ha = 3F 80 00 00
+    move_speed_de = 00 00 00 00
+    power_ha = 3F 80 00 00
+    power_de = 3F 80 00 00
+    power_aux_1 = 00 00 00 00
+    power_aux_2 = 00 00 00 00
+    power_aux_3 = 00 00 00 00
+    // byte 42 not used 00
+    step_focus = 00 00 00 00
+    ustep_focus = 00 00 00 00
+    move_speed_focus = char2float(buf+51);
+    checksum = buf[55];*/
+
+    if(!verify(buf)){
+        return false;
+    }
+
+
     ms_count = char2long(buf);
     step_ha = char2long(buf+4);
     step_de = char2long(buf+8);
@@ -52,7 +76,11 @@ Status_message::Status_message(char const *buf){
     ustep_focus = char2float(buf+47);
     move_speed_focus = char2float(buf+51);
     checksum = buf[55];
+
+    return true;
 }
+
+
 
 bool Status_message::verify(char const *buf){
     uint8_t checksum_calculated = 0;

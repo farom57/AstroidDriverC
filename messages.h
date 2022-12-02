@@ -24,7 +24,7 @@ class Status_message{
         uint8_t checksum;
 
         Status_message();
-        Status_message(char const *buf);
+        bool set_buf(char const *buf);
         static bool verify(char const *buf);
 
         double getDE();

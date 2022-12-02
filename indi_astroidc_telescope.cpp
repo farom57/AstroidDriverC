@@ -43,7 +43,7 @@ Astroid::Astroid()
 
     // Set capabilities supported by the mount.
     // The last parameters is the number of slew rates available.
-    SetTelescopeCapability(TELESCOPE_CAN_PARK | TELESCOPE_CAN_SYNC | TELESCOPE_CAN_GOTO | TELESCOPE_CAN_ABORT | TELESCOPE_HAS_PIER_SIDE |
+    SetTelescopeCapability(TELESCOPE_CAN_SYNC | TELESCOPE_CAN_GOTO | TELESCOPE_CAN_ABORT | TELESCOPE_HAS_PIER_SIDE |
                            TELESCOPE_HAS_TIME | TELESCOPE_HAS_TRACK_MODE | TELESCOPE_CAN_CONTROL_TRACK | TELESCOPE_HAS_TRACK_RATE,
                            4);
     setTelescopeConnection(CONNECTION_SERIAL);
@@ -81,13 +81,6 @@ bool Astroid::initProperties()
     TrackState = SCOPE_IDLE;
     setPierSide(PIER_WEST);
 
-    // How does the mount perform parking?
-    // Some mounts can handle the parking functionality internally in the controller.
-    // Other mounts have no native parking support and we use INDI to slew to a particular
-    // location (Equatorial or Horizontal) and then turn off tracking there and save the location to a file
-    // which would be remembered in the next power cycle.
-    // This is not required if there is native support in the mount controller itself.
-    SetParkDataType(PARK_AZ_ALT);
 
     // Let init the pulse guiding properties
     initGuiderProperties(getDeviceName(), MOTION_TAB);
@@ -116,22 +109,7 @@ bool Astroid::updateProperties()
         defineProperty(&GuideWENP);
         defineProperty(&GuideRateNP);
 
-        // Read the parking file, and check if we can load any saved parking information.
-        if (InitPark())
-        {
-            // If loading parking data is successful, we just set the default parking values.
-            // By default in this example, we consider parking position Az=0 and Alt=0
-            SetAxis1ParkDefault(0);
-            SetAxis2ParkDefault(0);
-        }
-        else
-        {
-            // Otherwise, we set all parking data to default in case no parking data is found.
-            SetAxis1Park(0);
-            SetAxis2Park(0);
-            SetAxis1ParkDefault(0);
-            SetAxis2ParkDefault(0);
-        }
+
     }
     else
     {
@@ -154,6 +132,13 @@ bool Astroid::Handshake()
 
         if(Astroid::ReadScopeStatus()){
             LOG_INFO("Connection sucessful");
+
+            // Reset sync
+            sync_coord_HA = get_local_sidereal_time(0.);    // assuming greenwich meridian
+            sync_step_HA = 0;
+            sync_coord_DE = 0;
+            sync_step_DE = 0;
+
             return true;
         }
         LOGF_INFO("Connection error: %d attempt", err_count+1);
@@ -189,7 +174,7 @@ bool Astroid::ReadScopeStatus()
         return false;
     }
 
-    if(!Status_message::verify(buf)){
+    if(!last_status.set_buf(buf)){
         uint8_t checksum_calculated = 0;
         for(int i = 0; i < 55; i++){
             checksum_calculated += buf[i];
@@ -200,252 +185,50 @@ bool Astroid::ReadScopeStatus()
 
     //LOG_DEBUG("Message OK");
     LOG_DEBUG("Message OK");
-    last_status = Status_message(buf);
+
+    char hex[200];
+    hexDump(hex,buf,56);
+    LOG_INFO(hex);
 
     double de = mod360((last_status.getDE() - sync_step_DE) / STEP_BY_TURN * 360. * (getPierSide() == PIER_EAST ? 1 : -1) + sync_coord_DE +90)-90;
     double ha = mod24((last_status.getHA() - sync_step_HA) / STEP_BY_TURN * 24. + sync_coord_HA);
-    NewRaDec(ha, de);
-    //LOGF_INFO("last_status.getDE(): %f sync_step_DE: %f sync_coord_DE: %f", last_status.getDE(), sync_step_DE, sync_coord_DE);
-    //LOGF_INFO("last_status.getHA(): %f sync_step_HA: %f sync_coord_HA: %f", last_status.getHA(), sync_step_HA, sync_coord_HA);
+    double ra = mod24(get_local_sidereal_time(0.)-ha);
 
-    /*// Here we read the mount position, pier side, any status of interest.
-    // This is called every POLLMS milliseconds (default 1000, but our driver set the default to 500)
+    char de_str[20], ha_str[20], ra_str[20];
+    fs_sexa(de_str,de,4,360000);
+    fs_sexa(ha_str,ha,4,360000);
+    fs_sexa(ra_str,ra,4,360000);
+    LOGF_INFO("DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
+    char de_sync_str[20], ha_sync_str[20];
+    fs_sexa(de_sync_str,sync_coord_DE,4,360000);
+    LOGF_INFO("sync_step_DE:%f sync_coord_DE:%s", sync_step_DE, last_status.getDE(), de_sync_str);
+    LOGF_INFO("step_de:%d ustep_de:%f last_status.getDE():%f",last_status.step_de, last_status.ustep_de, last_status.getDE());
+    fs_sexa(ha_sync_str,sync_coord_HA,4,360000);
+    LOGF_INFO("sync_step_HA:%f last_status.getHA():%f sync_coord_HA:%s", sync_step_HA, last_status.getHA(), ha_sync_str);
+    LOGF_INFO("step_ha:%d ustep_ha:%f last_status.getHA():%f",last_status.step_ha, last_status.ustep_ha, last_status.getHA());
+    normalize_ra_de(&ra, &de);
 
-    // For example, it could be a command like this
-    char cmd[DRIVER_LEN]={0}, res[DRIVER_LEN]={0};
-    if (sendCommand("GetCoordinates", res) == false)
-        return false;
-
-    double currentRA=0, currentDE=0;
-    // Assuming we get response as RA:DEC (Hours:Degree) e.g. "12.4:-34.6"
-    sscanf(res, "%lf:%lf", &currentRA, &currentDE);
-
-    char RAStr[DRIVER_LEN]={0}, DecStr[DRIVER_LEN]={0};
-    fs_sexa(RAStr, currentRA, 2, 3600);
-    fs_sexa(DecStr, currentDE, 2, 3600);
-    LOGF_DEBUG("Current RA: %s Current DEC: %s", RAStr, DecStr);
-
-    NewRaDec(currentRA, currentDE);
-
-    // E.g. get pier side as well
-    // assuming we need to send 3-bytes 0x11 0x22 0x33 to get the pier side, which is always 1 byte as 0 (EAST) or 1 (WEST)
-    cmd[0] = 0x11;
-    cmd[1] = 0x22;
-    cmd[2] = 0x33;
-
-    // Let us not forget to reset res buffer by zeroing it out
-    memset(res, 0, DRIVER_LEN);
-    if (sendCommand(cmd, res, 3, 1))
-    {
-        setPierSide(res[0] == 0 ? PIER_EAST : PIER_WEST);
-    }
-    */
-    return true;
-}
-
-bool Astroid::Goto(double RA, double DE)
-{
-    /*char cmd[DRIVER_LEN]={0}, res[DRIVER_LEN]={0};
-
-    // Assuming the command is in this format: sendCoords RA:DE
-    snprintf(cmd, DRIVER_LEN, "sendCoords %g:%g", RA, DE);
-    // Assuming response is 1-byte with '1' being OK, and anything else being failed.
-    if (sendCommand(cmd, res, -1, 1) == false)
-        return false;
-
-    if (res[0] != '1')
-        return false;
-
-    TrackState = SCOPE_SLEWING;
-
-    char RAStr[DRIVER_LEN]={0}, DecStr[DRIVER_LEN]={0};
-    fs_sexa(RAStr, RA, 2, 3600);
-    fs_sexa(DecStr, DE, 2, 3600);
-    LOGF_INFO("Slewing to RA: %s - DEC: %s", RAStr, DecStr);*/
-    return true;
-}
-
-bool Astroid::Sync(double RA, double DE)
-{
-    /*char cmd[DRIVER_LEN]={0}, res[DRIVER_LEN]={0};
-
-    // Assuming the command is in this format: syncCoords RA:DE
-    snprintf(cmd, DRIVER_LEN, "syncCoords %g:%g", RA, DE);
-    // Assuming response is 1-byte with '1' being OK, and anything else being failed.
-    if (sendCommand(cmd, res, -1, 1) == false)
-        return false;
-
-    if (res[0] != '1')
-        return false;
-
-    NewRaDec(RA, DE);*/
+    NewRaDec(ra, de);
 
     return true;
 }
 
-bool Astroid::Park()
-{
-    // Send command for parking here
-    TrackState = SCOPE_PARKING;
-    LOG_INFO("Parking telescope in progress...");
-    return true;
-}
-
-bool Astroid::UnPark()
-{
-    SetParked(false);
-    return true;
-}
-
-bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n)
-{
-    if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
-    {
-        // Guide Rate
-        if (strcmp(name, "GUIDE_RATE") == 0)
-        {
-            IUUpdateNumber(&GuideRateNP, values, names, n);
-            GuideRateNP.s = IPS_OK;
-            IDSetNumber(&GuideRateNP, nullptr);
-            return true;
-        }
-
-        // For guiding pulse, let's pass the properties up to the guide framework
-        if (strcmp(name, GuideNSNP.name) == 0 || strcmp(name, GuideWENP.name) == 0)
-        {
-            processGuiderProperties(name, values, names, n);
-            return true;
-        }
-    }
-
-    // Otherwise, send it up the chains to INDI::Telescope to process any further properties
-    return INDI::Telescope::ISNewNumber(dev, name, values, names, n);
-}
-
-
-bool Astroid::Abort()
-{
-    // Example of a function call where we expect no respose
-    return sendCommand("AbortMount");
-}
-
-bool Astroid::MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command)
-{
-    INDI_UNUSED(dir);
-    INDI_UNUSED(command);
-    if (TrackState == SCOPE_PARKED)
-    {
-        LOG_ERROR("Please unpark the mount before issuing any motion commands.");
+// Force de to be within -90..90 otherwise add +12h to ra and correct de. Return true if already in -90..90
+bool Astroid::normalize_ra_de(double *ra, double *de){
+    *de = mod360(*de+90)-90; // de is now within -90 and 270
+    if(*de>90){
+        *de=180-*de;
+        *ra=mod24(*ra+12);
         return false;
     }
-
-    // Implement here the actual calls to do the motion requested
     return true;
 }
 
-bool Astroid::MoveWE(INDI_DIR_WE dir, TelescopeMotionCommand command)
+bool Astroid::sendCommand()
 {
-    INDI_UNUSED(dir);
-    INDI_UNUSED(command);
-    if (TrackState == SCOPE_PARKED)
-    {
-        LOG_ERROR("Please unpark the mount before issuing any motion commands.");
-        return false;
-    }
-
-    // Implement here the actual calls to do the motion requested
-    return true;
-}
-
-IPState Astroid::GuideNorth(uint32_t ms)
-{
-    // Implement here the actual calls to do the motion requested
-    return IPS_BUSY;
-}
-
-IPState Astroid::GuideSouth(uint32_t ms)
-{
-    // Implement here the actual calls to do the motion requested
-    return IPS_BUSY;
-}
-
-IPState Astroid::GuideEast(uint32_t ms)
-{
-    // Implement here the actual calls to do the motion requested
-    return IPS_BUSY;
-}
-
-IPState Astroid::GuideWest(uint32_t ms)
-{
-    // Implement here the actual calls to do the motion requested
-    return IPS_BUSY;
-}
 
 
 
-bool Astroid::SetCurrentPark()
-{
-    // Depending on the parking type defined initially (PARK_RA_DEC or PARK_AZ_ALT...etc) set the current
-    // position AS the parking position.
-
-    // Assumg PARK_AZ_ALT, we need to do something like this:
-
-    // SetAxis1Park(getCurrentAz());
-    // SetAxis2Park(getCurrentAlt());
-
-    // Or if currentAz, currentAlt are defined as variables in our driver, then
-    // SetAxis1Park(currentAz);
-    // SetAxis2Park(currentAlt);
-
-    return true;
-}
-
-bool Astroid::SetDefaultPark()
-{
-    // For RA_DE park, we can use something like this:
-
-    // By default set RA to HA
-    SetAxis1Park(get_local_sidereal_time(LocationN[LOCATION_LONGITUDE].value));
-    // Set DEC to 90 or -90 depending on the hemisphere
-    SetAxis2Park((LocationN[LOCATION_LATITUDE].value > 0) ? 90 : -90);
-
-    // For Az/Alt, we can use something like this:
-
-    // Az = 0
-    SetAxis1Park(0);
-    // Alt = 0
-    SetAxis2Park(0);
-
-    return true;
-}
-
-bool Astroid::SetTrackMode(uint8_t mode)
-{
-    // Sidereal/Lunar/Solar..etc
-
-    // Send actual command here to device
-    INDI_UNUSED(mode);
-    return true;
-}
-
-bool Astroid::SetTrackEnabled(bool enabled)
-{
-    // Tracking on or off?
-    INDI_UNUSED(enabled);
-    // Send actual command here to device
-    return true;
-}
-
-bool Astroid::SetTrackRate(double raRate, double deRate)
-{
-    // Send actual command here to device
-    INDI_UNUSED(raRate);
-    INDI_UNUSED(deRate);
-    return true;
-}
-
-bool Astroid::sendCommand(const char * cmd, char * res, int cmd_len, int res_len)
-{
     /*int nbytes_written = 0, nbytes_read = 0, rc = -1;
 
     tcflush(PortFD, TCIOFLUSH);
@@ -502,6 +285,183 @@ bool Astroid::sendCommand(const char * cmd, char * res, int cmd_len, int res_len
 
     return true;
 }
+
+bool Astroid::Goto(double RA, double DE)
+{
+    /*char cmd[DRIVER_LEN]={0}, res[DRIVER_LEN]={0};
+
+    // Assuming the command is in this format: sendCoords RA:DE
+    snprintf(cmd, DRIVER_LEN, "sendCoords %g:%g", RA, DE);
+    // Assuming response is 1-byte with '1' being OK, and anything else being failed.
+    if (sendCommand(cmd, res, -1, 1) == false)
+        return false;
+
+    if (res[0] != '1')
+        return false;
+
+    TrackState = SCOPE_SLEWING;
+
+    char RAStr[DRIVER_LEN]={0}, DecStr[DRIVER_LEN]={0};
+    fs_sexa(RAStr, RA, 2, 3600);
+    fs_sexa(DecStr, DE, 2, 3600);
+    LOGF_INFO("Slewing to RA: %s - DEC: %s", RAStr, DecStr);*/
+    return true;
+}
+
+bool Astroid::Sync(double RA, double DE)
+{
+    /*char cmd[DRIVER_LEN]={0}, res[DRIVER_LEN]={0};
+
+    // Assuming the command is in this format: syncCoords RA:DE
+    snprintf(cmd, DRIVER_LEN, "syncCoords %g:%g", RA, DE);
+    // Assuming response is 1-byte with '1' being OK, and anything else being failed.
+    if (sendCommand(cmd, res, -1, 1) == false)
+        return false;
+
+    if (res[0] != '1')
+        return false;
+
+    NewRaDec(RA, DE);*/
+
+    return true;
+}
+
+
+
+bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n)
+{
+    if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
+    {
+        // Guide Rate
+        if (strcmp(name, "GUIDE_RATE") == 0)
+        {
+            IUUpdateNumber(&GuideRateNP, values, names, n);
+            GuideRateNP.s = IPS_OK;
+            IDSetNumber(&GuideRateNP, nullptr);
+            return true;
+        }
+
+        // For guiding pulse, let's pass the properties up to the guide framework
+        if (strcmp(name, GuideNSNP.name) == 0 || strcmp(name, GuideWENP.name) == 0)
+        {
+            processGuiderProperties(name, values, names, n);
+            return true;
+        }
+    }
+
+    // Otherwise, send it up the chains to INDI::Telescope to process any further properties
+    return INDI::Telescope::ISNewNumber(dev, name, values, names, n);
+}
+
+bool Astroid::updateSpeed(){
+    double speed_DE = (track_speed_DE+slew_DE_speed) * (getPierSide() == PIER_EAST ? 1 : -1);
+    double speed_HA = track_speed_HA-slew_RA_speed;
+
+    command.speed_ha = speed_HA;
+    command.speed_de = speed_DE;
+    command.power_ha = power_HA;
+    command.power_de = power_DE;
+
+
+    if(!sendCommand()){
+        TrackRateNP.s=IPS_ALERT;
+        IDSetNumber(&TrackRateNP, "Failed to update the speed");
+    }
+
+    TrackRateN[AXIS_RA].value=track_speed_HA;
+    TrackRateN[AXIS_DE].value=track_speed_DE;
+    TrackRateNP.s = (speed_HA == 0) && (speed_DE = 0 )? IPS_IDLE : IPS_OK;
+    IDSetNumber(&TrackRateNP, nullptr);
+
+    return true;
+}
+
+bool Astroid::Abort()
+{
+
+
+    goto_active = false;
+    slew_DE_speed = 0;
+    slew_RA_speed = 0;
+    track_speed_DE = 0;
+    track_speed_HA = fmax(fmin(TRACKRATE_SIDEREAL,track_speed_HA),0); // clip between 0 and TRACKRATE_SIDEREAL
+
+    return updateSpeed();
+}
+
+bool Astroid::MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command)
+{
+    INDI_UNUSED(dir);
+    INDI_UNUSED(command);
+
+    // Implement here the actual calls to do the motion requested
+    return true;
+}
+
+bool Astroid::MoveWE(INDI_DIR_WE dir, TelescopeMotionCommand command)
+{
+    INDI_UNUSED(dir);
+    INDI_UNUSED(command);
+
+
+    // Implement here the actual calls to do the motion requested
+    return true;
+}
+
+IPState Astroid::GuideNorth(uint32_t ms)
+{
+    // Implement here the actual calls to do the motion requested
+    return IPS_BUSY;
+}
+
+IPState Astroid::GuideSouth(uint32_t ms)
+{
+    // Implement here the actual calls to do the motion requested
+    return IPS_BUSY;
+}
+
+IPState Astroid::GuideEast(uint32_t ms)
+{
+    // Implement here the actual calls to do the motion requested
+    return IPS_BUSY;
+}
+
+IPState Astroid::GuideWest(uint32_t ms)
+{
+    // Implement here the actual calls to do the motion requested
+    return IPS_BUSY;
+}
+
+
+
+
+
+bool Astroid::SetTrackMode(uint8_t mode)
+{
+    // Sidereal/Lunar/Solar..etc
+
+    // Send actual command here to device
+    INDI_UNUSED(mode);
+    return true;
+}
+
+bool Astroid::SetTrackEnabled(bool enabled)
+{
+    // Tracking on or off?
+    INDI_UNUSED(enabled);
+    // Send actual command here to device
+    return true;
+}
+
+bool Astroid::SetTrackRate(double raRate, double deRate)
+{
+    // Send actual command here to device
+    INDI_UNUSED(raRate);
+    INDI_UNUSED(deRate);
+    return true;
+}
+
+
 
 void Astroid::hexDump(char * buf, const char * data, int size)
 {
