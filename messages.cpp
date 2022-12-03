@@ -35,25 +35,6 @@ Status_message::Status_message(){
 }
 
 bool Status_message::set_buf(char const *buf){
-    // example: 00 0C 96 66 00 00 00 53 00 00 03 BF 44 7C 00 00 44 14 00 00 3F 80 00 00 00 00 00 00 3F 80 00 00 3F 80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 72
-    /*ms_count = 00 0C 96 66
-    step_ha = 00 00 00 53
-    step_de = 00 00 03 BF
-    ustep_ha = 44 7C 00 00;
-    ustep_de = 44 14 00 00
-    move_speed_ha = 3F 80 00 00
-    move_speed_de = 00 00 00 00
-    power_ha = 3F 80 00 00
-    power_de = 3F 80 00 00
-    power_aux_1 = 00 00 00 00
-    power_aux_2 = 00 00 00 00
-    power_aux_3 = 00 00 00 00
-    // byte 42 not used 00
-    step_focus = 00 00 00 00
-    ustep_focus = 00 00 00 00
-    move_speed_focus = char2float(buf+51);
-    checksum = buf[55];*/
-
     if(!verify(buf)){
         return false;
     }

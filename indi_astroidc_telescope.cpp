@@ -65,16 +65,18 @@ bool Astroid::initProperties()
     IUFillNumberVector(&GuideRateNP, GuideRateN, 2, getDeviceName(), "GUIDE_RATE", "Guiding Rate", MOTION_TAB, IP_RW, 0,
                        IPS_IDLE);
 
-    // Since we have 4 slew rates, let's fill them out
-    IUFillSwitch(&SlewRateS[SLEW_GUIDE], "SLEW_GUIDE", "Guide", ISS_OFF);
-    IUFillSwitch(&SlewRateS[SLEW_CENTERING], "SLEW_CENTERING", "Centering", ISS_OFF);
-    IUFillSwitch(&SlewRateS[SLEW_FIND], "SLEW_FIND", "Find", ISS_OFF);
-    IUFillSwitch(&SlewRateS[SLEW_MAX], "SLEW_MAX", "Max", ISS_ON);
-    IUFillSwitchVector(&SlewRateSP, SlewRateS, 4, getDeviceName(), "TELESCOPE_SLEW_RATE", "Slew Rate", MOTION_TAB,
+    // Fill the slex rates
+    IUFillSwitch(&SlewRateS[SLEW_GUIDE], "SLEW_GUIDE", "1x", ISS_OFF);
+    IUFillSwitch(&SlewRateS[SLEW_CENTERING], "SLEW_CENTERING", "10x", ISS_OFF);
+    IUFillSwitch(&SlewRateS[SLEW_FIND], "SLEW_FIND", "50x", ISS_OFF);
+    IUFillSwitch(&SlewRateS[SLEW_MAX], "SLEW_MAX", "400x", ISS_ON);
+    IUFillSwitchVector(&SlewRateSP, SlewRateS, 5, getDeviceName(), "TELESCOPE_SLEW_RATE", "Slew Rate", MOTION_TAB,
                        IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
 
     // Add Tracking Modes. If you have SOLAR, LUNAR..etc, add them here as well.
     AddTrackMode("TRACK_SIDEREAL", "Sidereal", true);
+    AddTrackMode("TRACK_SOLAR", "Solar");
+    AddTrackMode("TRACK_LUNAR", "Lunar");
     AddTrackMode("TRACK_CUSTOM", "Custom");
 
     // The mount is initially in IDLE state.
@@ -91,8 +93,8 @@ bool Astroid::initProperties()
     // Set the driver interface to indicate that we can also do pulse guiding
     setDriverInterface(getDriverInterface() | GUIDER_INTERFACE);
 
-    // We want to query the mount every 500ms by default. The user can override this value.
-    setDefaultPollingPeriod(500);
+    // We want to query the mount every 100ms by default. The user can override this value.
+    setDefaultPollingPeriod(100);
 
 
 
@@ -161,6 +163,7 @@ bool Astroid::ReadScopeStatus()
 
     }*/
 
+
     if ((rc = tty_read_section_expanded (PortFD, buf, 0x55,0, 100000, &nbytes)) != TTY_OK)
     {
         LOGF_WARN("Preamble not found, result: %d", rc);
@@ -174,6 +177,13 @@ bool Astroid::ReadScopeStatus()
         return false;
     }
 
+    tcflush(PortFD, TCIOFLUSH);
+
+    char hex[200];
+    hexDump(hex,buf,56);
+    LOG_DEBUG("Message: ");
+    LOG_DEBUG(hex);
+
     if(!last_status.set_buf(buf)){
         uint8_t checksum_calculated = 0;
         for(int i = 0; i < 55; i++){
@@ -183,12 +193,6 @@ bool Astroid::ReadScopeStatus()
         return false;
     }
 
-    //LOG_DEBUG("Message OK");
-    LOG_DEBUG("Message OK");
-
-    char hex[200];
-    hexDump(hex,buf,56);
-    LOG_INFO(hex);
 
     double de = mod360((last_status.getDE() - sync_step_DE) / STEP_BY_TURN * 360. * (getPierSide() == PIER_EAST ? 1 : -1) + sync_coord_DE +90)-90;
     double ha = mod24((last_status.getHA() - sync_step_HA) / STEP_BY_TURN * 24. + sync_coord_HA);
@@ -198,14 +202,17 @@ bool Astroid::ReadScopeStatus()
     fs_sexa(de_str,de,4,360000);
     fs_sexa(ha_str,ha,4,360000);
     fs_sexa(ra_str,ra,4,360000);
-    LOGF_INFO("DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
+    LOGF_DEBUG("DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
+
+    /*
     char de_sync_str[20], ha_sync_str[20];
     fs_sexa(de_sync_str,sync_coord_DE,4,360000);
     LOGF_INFO("sync_step_DE:%f sync_coord_DE:%s", sync_step_DE, last_status.getDE(), de_sync_str);
     LOGF_INFO("step_de:%d ustep_de:%f last_status.getDE():%f",last_status.step_de, last_status.ustep_de, last_status.getDE());
     fs_sexa(ha_sync_str,sync_coord_HA,4,360000);
     LOGF_INFO("sync_step_HA:%f last_status.getHA():%f sync_coord_HA:%s", sync_step_HA, last_status.getHA(), ha_sync_str);
-    LOGF_INFO("step_ha:%d ustep_ha:%f last_status.getHA():%f",last_status.step_ha, last_status.ustep_ha, last_status.getHA());
+    LOGF_INFO("step_ha:%d ustep_ha:%f last_status.getHA():%f",last_status.step_ha, last_status.ustep_ha, last_status.getHA());*/
+
     normalize_ra_de(&ra, &de);
 
     NewRaDec(ra, de);
@@ -226,25 +233,19 @@ bool Astroid::normalize_ra_de(double *ra, double *de){
 
 bool Astroid::sendCommand()
 {
+    int nbytes_written = 0, rc;
+    char cmd[32];
 
+    command.get_bytes(cmd);
 
+    char hex_cmd[32 * 3] = {0};
+    hexDump(hex_cmd, cmd, 32);
+    LOGF_DEBUG("CMD <%s>", hex_cmd);
 
-    /*int nbytes_written = 0, nbytes_read = 0, rc = -1;
+    rc = tty_write(PortFD, cmd, 32, &nbytes_written);
+
 
     tcflush(PortFD, TCIOFLUSH);
-
-    if (cmd_len > 0)
-    {
-        char hex_cmd[DRIVER_LEN * 3] = {0};
-        hexDump(hex_cmd, cmd, cmd_len);
-        LOGF_DEBUG("CMD <%s>", hex_cmd);
-        rc = tty_write(PortFD, cmd, cmd_len, &nbytes_written);
-    }
-    else
-    {
-        LOGF_DEBUG("CMD <%s>", cmd);
-        rc = tty_write_string(PortFD, cmd, &nbytes_written);
-    }
 
     if (rc != TTY_OK)
     {
@@ -254,40 +255,16 @@ bool Astroid::sendCommand()
         return false;
     }
 
-    if (res == nullptr)
-        return true;
 
-    if (res_len > 0)
-        rc = tty_read(PortFD, res, res_len, DRIVER_TIMEOUT, &nbytes_read);
-    else
-        rc = tty_nread_section(PortFD, res, DRIVER_LEN, DRIVER_STOP_CHAR, DRIVER_TIMEOUT, &nbytes_read);
-
-    if (rc != TTY_OK)
-    {
-        char errstr[MAXRBUF] = {0};
-        tty_error_msg(rc, errstr, MAXRBUF);
-        LOGF_ERROR("Serial read error: %s.", errstr);
-        return false;
-    }
-
-    if (res_len > 0)
-    {
-        char hex_res[DRIVER_LEN * 3] = {0};
-        hexDump(hex_res, res, res_len);
-        LOGF_DEBUG("RES <%s>", hex_res);
-    }
-    else
-    {
-        LOGF_DEBUG("RES <%s>", res);
-    }
-
-    tcflush(PortFD, TCIOFLUSH);*/
+    tcflush(PortFD, TCIOFLUSH);
 
     return true;
 }
 
 bool Astroid::Goto(double RA, double DE)
 {
+    INDI_UNUSED(RA);
+    INDI_UNUSED(DE);
     /*char cmd[DRIVER_LEN]={0}, res[DRIVER_LEN]={0};
 
     // Assuming the command is in this format: sendCoords RA:DE
@@ -310,6 +287,8 @@ bool Astroid::Goto(double RA, double DE)
 
 bool Astroid::Sync(double RA, double DE)
 {
+    INDI_UNUSED(RA);
+    INDI_UNUSED(DE);
     /*char cmd[DRIVER_LEN]={0}, res[DRIVER_LEN]={0};
 
     // Assuming the command is in this format: syncCoords RA:DE
@@ -354,6 +333,34 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
 }
 
 bool Astroid::updateSpeed(){
+
+    if(track_enabled){
+        switch(track_mode){
+            case TRACK_SIDEREAL:
+                track_speed_HA = 1;
+                track_speed_DE = 0;
+                break;
+            case TRACK_SOLAR:
+                track_speed_HA = TRACKRATE_SOLAR/TRACKRATE_SIDEREAL;
+                track_speed_DE = 0;
+                break;
+            case TRACK_LUNAR:
+                track_speed_HA = TRACKRATE_LUNAR/TRACKRATE_SIDEREAL;
+                track_speed_DE = 0;
+                break;
+            case TRACK_CUSTOM:
+                track_speed_HA = track_custom_speed_HA;
+                track_speed_DE = track_custom_speed_DE;
+                break;
+            default:
+                track_speed_HA = 1;
+                track_speed_DE = 0;
+        }
+    }else{
+        track_speed_HA = 0;
+        track_speed_DE = 0;
+    }
+
     double speed_DE = (track_speed_DE+slew_DE_speed) * (getPierSide() == PIER_EAST ? 1 : -1);
     double speed_HA = track_speed_HA-slew_RA_speed;
 
@@ -384,50 +391,57 @@ bool Astroid::Abort()
     slew_DE_speed = 0;
     slew_RA_speed = 0;
     track_speed_DE = 0;
-    track_speed_HA = fmax(fmin(TRACKRATE_SIDEREAL,track_speed_HA),0); // clip between 0 and TRACKRATE_SIDEREAL
+    track_speed_HA = fmax(fmin(1,track_speed_HA),0); // clip between 0 and 1
 
     return updateSpeed();
 }
 
 bool Astroid::MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command)
 {
-    INDI_UNUSED(dir);
-    INDI_UNUSED(command);
+    if(command==MOTION_START){
+        slew_DE_speed = (dir == DIRECTION_NORTH ? 1.: -1.) * motion_speeds[IUFindOnSwitchIndex(&SlewRateSP)];
+    }else{ // MOTION_STOP
+        slew_DE_speed = 0;
+    }
 
-    // Implement here the actual calls to do the motion requested
-    return true;
+    return updateSpeed();
 }
 
 bool Astroid::MoveWE(INDI_DIR_WE dir, TelescopeMotionCommand command)
 {
-    INDI_UNUSED(dir);
-    INDI_UNUSED(command);
+    if(command==MOTION_START){
+        slew_RA_speed = (dir == DIRECTION_WEST ? 1.: -1.) * motion_speeds[IUFindOnSwitchIndex(&SlewRateSP)];
+    }else{ // MOTION_STOP
+        slew_RA_speed = 0;
+    }
 
-
-    // Implement here the actual calls to do the motion requested
-    return true;
+    return updateSpeed();
 }
 
 IPState Astroid::GuideNorth(uint32_t ms)
 {
+    INDI_UNUSED(ms);
     // Implement here the actual calls to do the motion requested
     return IPS_BUSY;
 }
 
 IPState Astroid::GuideSouth(uint32_t ms)
 {
+    INDI_UNUSED(ms);
     // Implement here the actual calls to do the motion requested
     return IPS_BUSY;
 }
 
 IPState Astroid::GuideEast(uint32_t ms)
 {
+    INDI_UNUSED(ms);
     // Implement here the actual calls to do the motion requested
     return IPS_BUSY;
 }
 
 IPState Astroid::GuideWest(uint32_t ms)
 {
+    INDI_UNUSED(ms);
     // Implement here the actual calls to do the motion requested
     return IPS_BUSY;
 }
@@ -438,27 +452,24 @@ IPState Astroid::GuideWest(uint32_t ms)
 
 bool Astroid::SetTrackMode(uint8_t mode)
 {
-    // Sidereal/Lunar/Solar..etc
+    track_mode = mode;
 
-    // Send actual command here to device
-    INDI_UNUSED(mode);
-    return true;
+    return updateSpeed();
 }
 
 bool Astroid::SetTrackEnabled(bool enabled)
 {
-    // Tracking on or off?
-    INDI_UNUSED(enabled);
-    // Send actual command here to device
-    return true;
+    track_enabled = enabled;
+
+    return updateSpeed();
 }
 
 bool Astroid::SetTrackRate(double raRate, double deRate)
 {
-    // Send actual command here to device
-    INDI_UNUSED(raRate);
-    INDI_UNUSED(deRate);
-    return true;
+    track_custom_speed_HA = raRate * TRACKRATE_SIDEREAL;
+    track_custom_speed_DE = deRate * TRACKRATE_SIDEREAL;
+
+    return updateSpeed();
 }
 
 
