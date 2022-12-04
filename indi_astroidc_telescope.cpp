@@ -60,8 +60,8 @@ bool Astroid::initProperties()
     INDI::Telescope::initProperties();
 
     // How fast do we guide compared to sidereal rate
-    IUFillNumber(&GuideRateN[AXIS_RA], "GUIDE_RATE_WE", "W/E Rate", "%.1f", 0, 1, 0.1, 0.5);
-    IUFillNumber(&GuideRateN[AXIS_DE], "GUIDE_RATE_NS", "N/S Rate", "%.1f", 0, 1, 0.1, 0.5);
+    IUFillNumber(&GuideRateN[AXIS_RA], "GUIDE_RATE_WE", "W/E Rate", "%.1f", 0, 10, 0.1, 0.5);
+    IUFillNumber(&GuideRateN[AXIS_DE], "GUIDE_RATE_NS", "N/S Rate", "%.1f", 0, 10, 0.1, 0.5);
     IUFillNumberVector(&GuideRateNP, GuideRateN, 2, getDeviceName(), "GUIDE_RATE", "Guiding Rate", MOTION_TAB, IP_RW, 0,
                        IPS_IDLE);
 
@@ -86,6 +86,7 @@ bool Astroid::initProperties()
 
     // Let init the pulse guiding properties
     initGuiderProperties(getDeviceName(), MOTION_TAB);
+    syncDriverInfo();
 
     // Add debug controls
     addDebugControl();
@@ -444,34 +445,122 @@ bool Astroid::MoveWE(INDI_DIR_WE dir, TelescopeMotionCommand command)
 
 IPState Astroid::GuideNorth(uint32_t ms)
 {
-    INDI_UNUSED(ms);
-    // Implement here the actual calls to do the motion requested
+    LOGF_DEBUG("Guiding: N %.0f ms", ms);
+
+    if (GuideNSTID)
+    {
+        IERmTimer(GuideNSTID);
+        GuideNSTID = 0;
+    }
+
+    slew_DE_speed = GuideRateN[AXIS_DE].value;
+
+    if (!updateSpeed())
+        return IPS_ALERT;
+
+    GuideNSTID = IEAddTimer(static_cast<int>(ms), stopNSPulseHelper, this);
     return IPS_BUSY;
 }
 
 IPState Astroid::GuideSouth(uint32_t ms)
 {
-    INDI_UNUSED(ms);
-    // Implement here the actual calls to do the motion requested
+    LOGF_DEBUG("Guiding: S %.0f ms", ms);
+
+    if (GuideNSTID)
+    {
+        IERmTimer(GuideNSTID);
+        GuideNSTID = 0;
+    }
+
+    slew_DE_speed = -GuideRateN[AXIS_DE].value;
+
+    if (!updateSpeed())
+        return IPS_ALERT;
+
+
+    GuideNSTID = IEAddTimer(static_cast<int>(ms), stopNSPulseHelper, this);
     return IPS_BUSY;
 }
 
 IPState Astroid::GuideEast(uint32_t ms)
 {
-    INDI_UNUSED(ms);
-    // Implement here the actual calls to do the motion requested
+    LOGF_DEBUG("Guiding: E %.0f ms", ms);
+
+    if (GuideWETID)
+    {
+        IERmTimer(GuideWETID);
+        GuideWETID = 0;
+    }
+
+    slew_RA_speed = GuideRateN[AXIS_RA].value;
+
+    if (!updateSpeed())
+        return IPS_ALERT;
+
+    GuideWETID = IEAddTimer(static_cast<int>(ms), stopWEPulseHelper, this);
     return IPS_BUSY;
 }
 
 IPState Astroid::GuideWest(uint32_t ms)
 {
-    INDI_UNUSED(ms);
-    // Implement here the actual calls to do the motion requested
+    LOGF_DEBUG("Guiding: W %.0f ms", ms);
+
+    if (GuideWETID)
+    {
+        IERmTimer(GuideWETID);
+        GuideWETID = 0;
+    }
+
+    slew_RA_speed = -GuideRateN[AXIS_RA].value;
+
+    if (!updateSpeed())
+        return IPS_ALERT;
+
+    GuideWETID = IEAddTimer(static_cast<int>(ms), stopWEPulseHelper, this);
     return IPS_BUSY;
 }
 
+void Astroid::stopNSPulseHelper(void *p)
+{
+    static_cast<Astroid *>(p)->stopNSPulse();
+}
 
+void Astroid::stopWEPulseHelper(void *p)
+{
+    static_cast<Astroid *>(p)->stopWEPulse();
+}
 
+void Astroid::stopNSPulse(){
+    slew_DE_speed = 0;
+    if(updateSpeed()){
+        GuideNSNP.s = IPS_IDLE;
+        LOG_DEBUG("Guiding: DEC axis stopped.");
+    }else{
+        GuideNSNP.s = IPS_ALERT;
+        LOG_ERROR("Failed to stop DEC axis.");
+    }
+
+    GuideNSTID = 0;
+    GuideNSNP.np[0].value = 0;
+    GuideNSNP.np[1].value = 0;
+    IDSetNumber(&GuideNSNP, nullptr);
+}
+
+void Astroid::stopWEPulse(){
+    slew_RA_speed = 0;
+    if(updateSpeed()){
+        GuideWENP.s = IPS_IDLE;
+        LOG_DEBUG("Guiding: RA axis stopped.");
+    }else{
+        GuideWENP.s = IPS_ALERT;
+        LOG_ERROR("Failed to stop RA axis.");
+    }
+
+    GuideWETID = 0;
+    GuideWENP.np[0].value = 0;
+    GuideWENP.np[1].value = 0;
+    IDSetNumber(&GuideWENP, nullptr);
+}
 
 
 bool Astroid::SetTrackMode(uint8_t mode)

@@ -174,8 +174,11 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
         double power_DE = 1;
         double power_FOCUS = 1;
 
+        int GuideNSTID { -1 };
+        int GuideWETID { -1 };
 
-
+        void stopNSPulse();
+        void stopWEPulse();
 
 
         /////////////////////////////////////////////////////////////////////////////
@@ -184,5 +187,6 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
         static double mod360(double x);
         static double mod24(double x);
         static bool normalize_ra_de(double *ra, double *de);
-
+        static void stopNSPulseHelper(void *p);
+        static void stopWEPulseHelper(void *p);
 };
