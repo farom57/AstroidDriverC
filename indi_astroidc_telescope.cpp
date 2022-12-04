@@ -79,8 +79,8 @@ bool Astroid::initProperties()
     AddTrackMode("TRACK_LUNAR", "Lunar");
     AddTrackMode("TRACK_CUSTOM", "Custom");
 
-    // The mount is initially in IDLE state.
-    TrackState = SCOPE_IDLE;
+    // The mount is initially in SLEWING state.
+    TrackState = SCOPE_SLEWING;
     setPierSide(PIER_WEST);
 
 
@@ -158,12 +158,6 @@ bool Astroid::ReadScopeStatus()
     char buf[200];
     int nbytes = 0, rc = 0;
 
-    /*if (!isConnected()){
-        LOG_ERROR("Error not connected");
-
-    }*/
-
-
     if ((rc = tty_read_section_expanded (PortFD, buf, 0x55,0, 100000, &nbytes)) != TTY_OK)
     {
         LOGF_WARN("Preamble not found, result: %d", rc);
@@ -213,9 +207,59 @@ bool Astroid::ReadScopeStatus()
     LOGF_INFO("sync_step_HA:%f last_status.getHA():%f sync_coord_HA:%s", sync_step_HA, last_status.getHA(), ha_sync_str);
     LOGF_INFO("step_ha:%d ustep_ha:%f last_status.getHA():%f",last_status.step_ha, last_status.ustep_ha, last_status.getHA());*/
 
+    static struct timeval ltv { 0, 0 };
+    struct timeval tv { 0, 0 };
+    double dt = 0;
+    /* update elapsed time since last poll, don't presume exactly POLLMS */
+    gettimeofday(&tv, nullptr);
+    if (ltv.tv_sec == 0 && ltv.tv_usec == 0)
+        ltv = tv;
+    dt  = tv.tv_sec - ltv.tv_sec + (tv.tv_usec - ltv.tv_usec) / 1e6;
+    ltv = tv;
+
+    if(goto_active){
+        bool ra_done = false, de_done = false;
+
+        // DE
+        double distance_DE = goto_target_DE - de;
+        if (fabs(distance_DE) < GOTO_STOP_DISTANCE){
+            slew_DE_speed = 0;
+            de_done = true;
+        }else if(GOTO_ACC_T>0){
+            if (2*fabs(distance_DE)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_DE_speed*360./86400.)*(slew_DE_speed*360./86400.)){
+                slew_DE_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_DE > 0 ? 1 : -1);
+            }else{
+                slew_DE_speed = 86400./360.*fsqrt(2*(fabs(distance_DE))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_DE > 0 ? 1 : -1);
+            }
+            slew_DE_speed = fmin(fmax(slew_DE_speed,-GOTO_SPEED),GOTO_SPEED);
+        }else{
+            slew_DE_speed = GOTO_SPEED*(distance_DE > 0 ? 1 : -1);
+        }
+
+        // RA
+        double distance_RA = (mod24(goto_target_RA - ra + 12) - 12)*15; // between -180 and 180
+        if (fabs(distance_RA) < GOTO_STOP_DISTANCE){
+            slew_RA_speed = 0;
+            ra_done=true;
+        }else if(GOTO_ACC_T>0){
+            if (2*fabs(distance_RA)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_RA_speed*360./86400.)*(slew_RA_speed*360./86400.)){
+                slew_RA_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_RA > 0 ? 1 : -1);
+            }else{
+                slew_RA_speed = 86400./360.*fsqrt(2*(fabs(distance_RA))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_RA > 0 ? 1 : -1);
+            }
+            slew_RA_speed = fmin(fmax(slew_RA_speed,-GOTO_SPEED),GOTO_SPEED);
+        }else{
+            slew_RA_speed = GOTO_SPEED*(distance_RA > 0 ? 1 : -1);
+        }
+        LOGF_DEBUG("GOTO: dRA=%f sRA=%f dDE=%f sDE=%f", distance_RA,slew_RA_speed, distance_DE,slew_DE_speed);
+        goto_active = !(ra_done && de_done);
+        updateSpeed();
+    }
+
     normalize_ra_de(&ra, &de);
 
     NewRaDec(ra, de);
+
 
     return true;
 }
@@ -263,44 +307,26 @@ bool Astroid::sendCommand()
 
 bool Astroid::Goto(double RA, double DE)
 {
-    INDI_UNUSED(RA);
-    INDI_UNUSED(DE);
-    /*char cmd[DRIVER_LEN]={0}, res[DRIVER_LEN]={0};
-
-    // Assuming the command is in this format: sendCoords RA:DE
-    snprintf(cmd, DRIVER_LEN, "sendCoords %g:%g", RA, DE);
-    // Assuming response is 1-byte with '1' being OK, and anything else being failed.
-    if (sendCommand(cmd, res, -1, 1) == false)
-        return false;
-
-    if (res[0] != '1')
-        return false;
-
+    goto_target_RA = RA;
+    goto_target_DE = DE;
+    goto_active = true;
     TrackState = SCOPE_SLEWING;
 
-    char RAStr[DRIVER_LEN]={0}, DecStr[DRIVER_LEN]={0};
+    char RAStr[20]={0}, DecStr[20]={0};
     fs_sexa(RAStr, RA, 2, 3600);
     fs_sexa(DecStr, DE, 2, 3600);
-    LOGF_INFO("Slewing to RA: %s - DEC: %s", RAStr, DecStr);*/
+    LOGF_INFO("Slewing to RA: %s - DEC: %s", RAStr, DecStr);
+
     return true;
 }
 
 bool Astroid::Sync(double RA, double DE)
 {
-    INDI_UNUSED(RA);
-    INDI_UNUSED(DE);
-    /*char cmd[DRIVER_LEN]={0}, res[DRIVER_LEN]={0};
-
-    // Assuming the command is in this format: syncCoords RA:DE
-    snprintf(cmd, DRIVER_LEN, "syncCoords %g:%g", RA, DE);
-    // Assuming response is 1-byte with '1' being OK, and anything else being failed.
-    if (sendCommand(cmd, res, -1, 1) == false)
-        return false;
-
-    if (res[0] != '1')
-        return false;
-
-    NewRaDec(RA, DE);*/
+    normalize_ra_de(&RA, &DE);
+    sync_step_HA = last_status.getHA();
+    sync_step_DE = last_status.getDE();
+    sync_coord_HA = mod24(get_local_sidereal_time(0.) - RA);
+    sync_coord_DE = DE;
 
     return true;
 }
@@ -334,7 +360,7 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
 
 bool Astroid::updateSpeed(){
 
-    if(track_enabled){
+    if(TrackState == SCOPE_SLEWING){
         switch(track_mode){
             case TRACK_SIDEREAL:
                 track_speed_HA = 1;
@@ -375,8 +401,8 @@ bool Astroid::updateSpeed(){
         IDSetNumber(&TrackRateNP, "Failed to update the speed");
     }
 
-    TrackRateN[AXIS_RA].value=track_speed_HA;
-    TrackRateN[AXIS_DE].value=track_speed_DE;
+    TrackRateN[AXIS_RA].value=track_speed_HA*TRACKRATE_SIDEREAL;
+    TrackRateN[AXIS_DE].value=track_speed_DE*TRACKRATE_SIDEREAL;
     TrackRateNP.s = (speed_HA == 0) && (speed_DE = 0 )? IPS_IDLE : IPS_OK;
     IDSetNumber(&TrackRateNP, nullptr);
 
@@ -385,8 +411,6 @@ bool Astroid::updateSpeed(){
 
 bool Astroid::Abort()
 {
-
-
     goto_active = false;
     slew_DE_speed = 0;
     slew_RA_speed = 0;
@@ -410,7 +434,7 @@ bool Astroid::MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command)
 bool Astroid::MoveWE(INDI_DIR_WE dir, TelescopeMotionCommand command)
 {
     if(command==MOTION_START){
-        slew_RA_speed = (dir == DIRECTION_WEST ? 1.: -1.) * motion_speeds[IUFindOnSwitchIndex(&SlewRateSP)];
+        slew_RA_speed = (dir == DIRECTION_EAST ? 1.: -1.) * motion_speeds[IUFindOnSwitchIndex(&SlewRateSP)];
     }else{ // MOTION_STOP
         slew_RA_speed = 0;
     }
@@ -459,15 +483,15 @@ bool Astroid::SetTrackMode(uint8_t mode)
 
 bool Astroid::SetTrackEnabled(bool enabled)
 {
-    track_enabled = enabled;
+    TrackState = (enabled ? SCOPE_SLEWING : SCOPE_IDLE);
 
     return updateSpeed();
 }
 
 bool Astroid::SetTrackRate(double raRate, double deRate)
 {
-    track_custom_speed_HA = raRate * TRACKRATE_SIDEREAL;
-    track_custom_speed_DE = deRate * TRACKRATE_SIDEREAL;
+    track_custom_speed_HA = raRate / TRACKRATE_SIDEREAL;
+    track_custom_speed_DE = deRate / TRACKRATE_SIDEREAL;
 
     return updateSpeed();
 }

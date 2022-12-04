@@ -74,7 +74,7 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
         virtual bool ReadScopeStatus() override;
 
         bool sendCommand();
-
+        bool updateSpeed();
         Status_message last_status;
         Cmd_message command;
 
@@ -159,11 +159,11 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
         double motion_speeds[4] = {1., 10., 50., 400};
 
 
-        double track_speed_HA = 1;
-        double track_speed_DE = 0;
+        double track_speed_HA = 1.;
+        double track_speed_DE = 0.;
 
         uint8_t track_mode=TRACK_SIDEREAL; // TRACK_SIDEREAL, TRACK_SOLAR, TRACK_LUNAR, TRACK_CUSTOM
-        bool track_enabled=true;
+
         double track_custom_speed_HA = 1;
         double track_custom_speed_DE = 0;
 
@@ -174,9 +174,8 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
         double power_DE = 1;
         double power_FOCUS = 1;
 
-        bool updateSpeed();
 
-        //bool track_enabled;
+
 
 
         /////////////////////////////////////////////////////////////////////////////
