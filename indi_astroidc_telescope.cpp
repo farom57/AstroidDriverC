@@ -230,7 +230,7 @@ bool Astroid::ReadScopeStatus()
             if (2*fabs(distance_DE)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_DE_speed*360./86400.)*(slew_DE_speed*360./86400.)){
                 slew_DE_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_DE > 0 ? 1 : -1);
             }else{
-                slew_DE_speed = 86400./360.*fsqrt(2*(fabs(distance_DE))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_DE > 0 ? 1 : -1);
+                slew_DE_speed = 86400./360.*sqrt(2*(fabs(distance_DE))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_DE > 0 ? 1 : -1);
             }
             slew_DE_speed = fmin(fmax(slew_DE_speed,-GOTO_SPEED),GOTO_SPEED);
         }else{
@@ -246,7 +246,7 @@ bool Astroid::ReadScopeStatus()
             if (2*fabs(distance_RA)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_RA_speed*360./86400.)*(slew_RA_speed*360./86400.)){
                 slew_RA_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_RA > 0 ? 1 : -1);
             }else{
-                slew_RA_speed = 86400./360.*fsqrt(2*(fabs(distance_RA))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_RA > 0 ? 1 : -1);
+                slew_RA_speed = 86400./360.*sqrt(2*(fabs(distance_RA))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_RA > 0 ? 1 : -1);
             }
             slew_RA_speed = fmin(fmax(slew_RA_speed,-GOTO_SPEED),GOTO_SPEED);
         }else{
