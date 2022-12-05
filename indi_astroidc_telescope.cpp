@@ -287,6 +287,8 @@ bool Astroid::sendCommand()
     hexDump(hex_cmd, cmd, 32);
     LOGF_DEBUG("CMD <%s>", hex_cmd);
 
+    tcflush(PortFD, TCIOFLUSH);
+
     rc = tty_write(PortFD, cmd, 32, &nbytes_written);
 
 
@@ -301,7 +303,7 @@ bool Astroid::sendCommand()
     }
 
 
-    //tcflush(PortFD, TCIOFLUSH);
+
 
     return true;
 }
