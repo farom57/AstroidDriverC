@@ -279,17 +279,17 @@ bool Astroid::normalize_ra_de(double *ra, double *de){
 bool Astroid::sendCommand()
 {
     int nbytes_written = 0, rc;
-    char cmd[32];
+    char cmd[32+1];
 
     command.get_bytes(cmd);
 
-    char hex_cmd[32 * 3] = {0};
-    hexDump(hex_cmd, cmd, 32);
-    LOGF_DEBUG("CMD <%s>", hex_cmd);
+    char hex_cmd[32 * 3+3] = {0};
+    hexDump(hex_cmd, cmd, 32+1);
+    LOGF_INFO("CMD <%s>", hex_cmd);
 
     tcflush(PortFD, TCIOFLUSH);
 
-    rc = tty_write(PortFD, cmd, 32, &nbytes_written);
+    rc = tty_write(PortFD, cmd, 32+1, &nbytes_written);
 
 
     //tcflush(PortFD, TCIOFLUSH);
