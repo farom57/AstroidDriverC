@@ -290,7 +290,7 @@ bool Astroid::sendCommand()
     rc = tty_write(PortFD, cmd, 32, &nbytes_written);
 
 
-    tcflush(PortFD, TCIOFLUSH);
+    //tcflush(PortFD, TCIOFLUSH);
 
     if (rc != TTY_OK)
     {
@@ -301,7 +301,7 @@ bool Astroid::sendCommand()
     }
 
 
-    tcflush(PortFD, TCIOFLUSH);
+    //tcflush(PortFD, TCIOFLUSH);
 
     return true;
 }
