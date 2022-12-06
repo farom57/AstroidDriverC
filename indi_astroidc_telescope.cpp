@@ -280,19 +280,17 @@ bool Astroid::sendCommand()
 {
     int nbytes_written = 0;
     uint8_t cmd[32];
-    LOGF_INFO("1. cmd[0]=%02X",cmd[0]);
     command.get_bytes(cmd);
-    LOGF_INFO("2. cmd[0]=%02X",cmd[0]);
     char hex_cmd[32 * 3 + 1] = {0};
-    LOGF_INFO("3. cmd[0]=%02X",cmd[0]);
+
     hexDump(hex_cmd, cmd, 32);
-    LOGF_INFO("4. cmd[0]=%02X",cmd[0]);
-    LOGF_INFO("CMD %s", hex_cmd);
-    LOGF_INFO("5. cmd[0]=%02X",cmd[0]);
+
+    LOGF_DEBUG("CMD %s", hex_cmd);
+
     errno = 0;
-    LOGF_INFO("6. cmd[0]=%02X",cmd[0]);
+
     nbytes_written = write(PortFD, cmd, 32);
-    LOGF_INFO("7. cmd[0]=%02X",cmd[0]);
+
 
     //tcflush(PortFD, TCIOFLUSH);
 
@@ -301,7 +299,7 @@ bool Astroid::sendCommand()
         LOGF_ERROR("nbytes_written: %d < 32 errno=%d", nbytes_written, errno);
         return false;
     }
-    LOGF_INFO("8. cmd[0]=%02X",cmd[0]);
+
 
     if(!ReadScopeStatus()){
         LOG_DEBUG("CMD check first try failed");
@@ -310,7 +308,7 @@ bool Astroid::sendCommand()
             return false;
         }
     }
-    LOGF_INFO("9. cmd[0]=%02X",cmd[0]);
+
 
     if( command.speed_ha==last_status.move_speed_ha &&
         command.speed_de==last_status.move_speed_de &&
@@ -323,13 +321,11 @@ bool Astroid::sendCommand()
         LOG_DEBUG("CMD check OK");
         return true;
     }
-    LOGF_INFO("9. cmd[0]=%02X",cmd[0]);
+
 
 
     LOG_WARN("CMD check failed: incorrect return. Retrying");
-    LOGF_INFO("10. cmd[0]=%02X",cmd[0]);
 
-    cmd[0]=0x42;
 
     errno = 0;
     nbytes_written = write(PortFD, cmd, 32);
