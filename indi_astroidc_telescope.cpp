@@ -283,7 +283,7 @@ bool Astroid::sendCommand()
     LOGF_INFO("1. cmd[0]=%02X",cmd[0]);
     command.get_bytes(cmd);
     LOGF_INFO("2. cmd[0]=%02X",cmd[0]);
-    char hex_cmd[32 * 3] = {0};
+    char hex_cmd[32 * 3 + 1] = {0};
     LOGF_INFO("3. cmd[0]=%02X",cmd[0]);
     hexDump(hex_cmd, cmd, 32);
     LOGF_INFO("4. cmd[0]=%02X",cmd[0]);
