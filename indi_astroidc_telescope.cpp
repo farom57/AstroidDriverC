@@ -278,7 +278,7 @@ bool Astroid::normalize_ra_de(double *ra, double *de){
 
 bool Astroid::sendCommand()
 {
-    int nbytes_written = 0, rc;
+    /*int nbytes_written = 0, rc;
     char cmd[32+1];
 
     command.get_bytes(cmd);
@@ -302,7 +302,14 @@ bool Astroid::sendCommand()
         return false;
     }
 
+    return true;*/
 
+
+
+    uint8_t buf[]={0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00};
+    int nbytes_written = 0;
+    nbytes_written = write(PortFD, buf, 16);
+    LOGF_INFO("nbytes_written = %d errno=%d", nbytes_written, errno);
 
 
     return true;
