@@ -278,42 +278,83 @@ bool Astroid::normalize_ra_de(double *ra, double *de){
 
 bool Astroid::sendCommand()
 {
-    /*int nbytes_written = 0, rc;
-    char cmd[32+1];
+    int nbytes_written = 0;
+    char cmd[32];
 
     command.get_bytes(cmd);
 
-    char hex_cmd[32 * 3+3] = {0};
-    hexDump(hex_cmd, cmd, 32+1);
-    LOGF_INFO("CMD <%s>", hex_cmd);
+    char hex_cmd[32 * 3] = {0};
+    hexDump(hex_cmd, cmd, 32);
+    LOGF_DEBUG("CMD %s", hex_cmd);
 
-    tcflush(PortFD, TCIOFLUSH);
-
-    rc = tty_write(PortFD, cmd, 32+1, &nbytes_written);
+    errno = 0;
+    nbytes_written = write(PortFD, cmd, 32);
 
 
     //tcflush(PortFD, TCIOFLUSH);
 
-    if (rc != TTY_OK)
+    if (nbytes_written != 32)
     {
-        char errstr[MAXRBUF] = {0};
-        tty_error_msg(rc, errstr, MAXRBUF);
-        LOGF_ERROR("Serial write error: %s.", errstr);
+        LOGF_ERROR("nbytes_written: %d < 32 errno=%d", nbytes_written, errno);
         return false;
     }
 
-    return true;*/
 
+    if(!ReadScopeStatus()){
+        LOG_DEBUG("CMD check first try failed");
+        if(!ReadScopeStatus()){
+            LOG_ERROR("CMD check failed: cannot read status after 2 tries");
+            return false;
+        }
+    }
 
+    if( command.speed_ha==last_status.move_speed_ha &&
+        command.speed_de==last_status.move_speed_de &&
+        command.power_ha==last_status.power_ha &&
+        command.power_de==last_status.power_de &&
+        command.power_aux_1==last_status.power_aux_1 &&
+        command.power_aux_2==last_status.power_aux_2 &&
+        command.power_aux_3==last_status.power_aux_3 &&
+        command.speed_focus==last_status.move_speed_focus){
+        LOG_DEBUG("CMD check OK");
+        return true;
+    }
 
-    uint8_t buf[]={0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00,0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00};
-    int nbytes_written = 0;
-    nbytes_written = write(PortFD, buf, 32);
+    LOG_WARN("CMD check failed: incorrect return. Retrying");
+
     errno = 0;
-    LOGF_INFO("nbytes_written = %d errno=%d", nbytes_written, errno);
+    nbytes_written = write(PortFD, cmd, 32);
+
+    if (nbytes_written != 32)
+    {
+        LOGF_ERROR("nbytes_written: %d < 32 errno=%d", nbytes_written, errno);
+        return false;
+    }
 
 
-    return true;
+    if(!ReadScopeStatus()){
+        LOG_DEBUG("CMD check first try failed");
+        if(!ReadScopeStatus()){
+            LOG_ERROR("CMD check failed: cannot read status after 2 tries");
+            return false;
+        }
+    }
+
+    if( command.speed_ha==last_status.move_speed_ha &&
+        command.speed_de==last_status.move_speed_de &&
+        command.power_ha==last_status.power_ha &&
+        command.power_de==last_status.power_de &&
+        command.power_aux_1==last_status.power_aux_1 &&
+        command.power_aux_2==last_status.power_aux_2 &&
+        command.power_aux_3==last_status.power_aux_3 &&
+        command.speed_focus==last_status.move_speed_focus){
+        LOG_DEBUG("CMD check OK");
+        return true;
+    }
+
+    LOG_ERROR("CMD check failed: incorrect return x2");
+
+    return false;
 }
 
 bool Astroid::Goto(double RA, double DE)
