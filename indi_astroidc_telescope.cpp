@@ -285,7 +285,7 @@ bool Astroid::sendCommand()
 
     char hex_cmd[32 * 3] = {0};
     hexDump(hex_cmd, cmd, 32);
-    LOGF_DEBUG("CMD %s", hex_cmd);
+    LOGF_INFO("CMD %s", hex_cmd);
 
     errno = 0;
     nbytes_written = write(PortFD, cmd, 32);
