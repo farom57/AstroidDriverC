@@ -134,7 +134,7 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
          * @param size length of the command in bytes.
          * @note This is called internally by sendCommand, no need to call it directly.
          */
-        void hexDump(char * buf, const char * data, int size);
+        void hexDump(char * buf, const uint8_t * data, int size);
 
 
 

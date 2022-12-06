@@ -175,7 +175,7 @@ bool Astroid::ReadScopeStatus()
     tcflush(PortFD, TCIOFLUSH);
 
     char hex[200];
-    hexDump(hex,(char *)buf,56);
+    hexDump(hex,buf,56);
     LOG_DEBUG("Message: ");
     LOG_DEBUG(hex);
 
@@ -284,7 +284,7 @@ bool Astroid::sendCommand()
     command.get_bytes(cmd);
 
     char hex_cmd[32 * 3] = {0};
-    hexDump(hex_cmd, (char *)cmd, 32);
+    hexDump(hex_cmd, cmd, 32);
     LOGF_INFO("CMD %s", hex_cmd);
 
     errno = 0;
@@ -322,6 +322,7 @@ bool Astroid::sendCommand()
     }
 
     LOG_WARN("CMD check failed: incorrect return. Retrying");
+    LOGF_WARN("cmd[0]=%02X",cmd[0]);
 
     cmd[0]=0x42;
 
@@ -641,10 +642,10 @@ bool Astroid::SetTrackRate(double raRate, double deRate)
 
 
 
-void Astroid::hexDump(char * buf, const char * data, int size)
+void Astroid::hexDump(char * buf, const uint8_t * data, int size)
 {
     for (int i = 0; i < size; i++)
-        sprintf(buf + 3 * i, "%02X ", static_cast<uint8_t>(data[i]));
+        sprintf(buf + 3 * i, "%02X ", data[i]);
 
     if (size > 0)
         buf[3 * size - 1] = '\0';
