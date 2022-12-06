@@ -156,17 +156,17 @@ bool Astroid::Handshake()
 bool Astroid::ReadScopeStatus()
 {
 
-    char buf[200];
+    uint8_t buf[200];
     int nbytes = 0, rc = 0;
 
-    if ((rc = tty_read_section_expanded (PortFD, buf, 0x55,0, 100000, &nbytes)) != TTY_OK)
+    if ((rc = tty_read_section_expanded (PortFD, (char *)buf, 0x55,0, 100000, &nbytes)) != TTY_OK)
     {
         LOGF_WARN("Preamble not found, result: %d", rc);
         return false;
     }
     LOGF_DEBUG("discarded %d bytes", nbytes);
 
-    if ((rc = tty_read_expanded (PortFD, buf, Status_message::SIZE, 0, 5000, &nbytes)) != TTY_OK)
+    if ((rc = tty_read_expanded (PortFD, (char *)buf, Status_message::SIZE, 0, 5000, &nbytes)) != TTY_OK)
     {
         LOGF_WARN("Error reading. Result: %d nbytes: %d", rc, nbytes, PortFD);
         return false;
@@ -175,7 +175,7 @@ bool Astroid::ReadScopeStatus()
     tcflush(PortFD, TCIOFLUSH);
 
     char hex[200];
-    hexDump(hex,buf,56);
+    hexDump(hex,(char *)buf,56);
     LOG_DEBUG("Message: ");
     LOG_DEBUG(hex);
 
@@ -279,15 +279,16 @@ bool Astroid::normalize_ra_de(double *ra, double *de){
 bool Astroid::sendCommand()
 {
     int nbytes_written = 0;
-    char cmd[32];
+    uint8_t cmd[32];
 
     command.get_bytes(cmd);
 
     char hex_cmd[32 * 3] = {0};
-    hexDump(hex_cmd, cmd, 32);
+    hexDump(hex_cmd, (char *)cmd, 32);
     LOGF_INFO("CMD %s", hex_cmd);
 
     errno = 0;
+
     nbytes_written = write(PortFD, cmd, 32);
 
 
@@ -321,6 +322,8 @@ bool Astroid::sendCommand()
     }
 
     LOG_WARN("CMD check failed: incorrect return. Retrying");
+
+    cmd[0]=0x42;
 
     errno = 0;
     nbytes_written = write(PortFD, cmd, 32);

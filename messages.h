@@ -24,8 +24,8 @@ class Status_message{
         uint8_t checksum;
 
         Status_message();
-        bool set_buf(char const *buf);
-        static bool verify(char const *buf);
+        bool set_buf(uint8_t const *buf);
+        static bool verify(uint8_t const *buf);
 
         double getDE();
         double getHA();
@@ -48,6 +48,6 @@ class Cmd_message{
         float power_focus;
 
         Cmd_message();
-        void get_bytes(char *buf);
+        void get_bytes(uint8_t *buf);
 
 };

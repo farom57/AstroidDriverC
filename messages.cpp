@@ -1,15 +1,15 @@
 #include "messages.h"
 
-float char2float(char const *buf){
+float char2float(uint8_t const *buf){
     uint32_t tmp = ((uint8_t)buf[0]<<24) + ((uint8_t)buf[1] << 16) + ((uint8_t)buf[2] << 8) + (uint8_t)buf[3];
     return *(float*)(&tmp);
 }
 
-int32_t char2long(char const *buf){
+int32_t char2long(uint8_t const *buf){
     return ((uint8_t)buf[0]<<24) + ((uint8_t)buf[1] << 16) + ((uint8_t)buf[2] << 8) + (uint8_t)buf[3];
 }
 
-uint16_t char2uint(char const *buf){
+uint16_t char2uint(uint8_t const *buf){
     return (buf[0]<<8) + buf[1];
 }
 
@@ -34,7 +34,7 @@ Status_message::Status_message(){
     checksum = 0;
 }
 
-bool Status_message::set_buf(char const *buf){
+bool Status_message::set_buf(uint8_t const *buf){
     if(!verify(buf)){
         return false;
     }
@@ -63,7 +63,7 @@ bool Status_message::set_buf(char const *buf){
 
 
 
-bool Status_message::verify(char const *buf){
+bool Status_message::verify(uint8_t const *buf){
     uint8_t checksum_calculated = 0;
     for(int i = 0; i < 55; i++){
         checksum_calculated += buf[i];
@@ -93,7 +93,7 @@ Cmd_message::Cmd_message(){
     power_focus = 0;
 }
 
-void float2char(float val, char *buf){
+void float2char(float val, uint8_t *buf){
     uint32_t val2 = *(uint32_t*)(&val);
     buf[0] = (val2 >> 24) & 0xFF;
     buf[1] = (val2 >> 16) & 0xFF;
@@ -101,12 +101,12 @@ void float2char(float val, char *buf){
     buf[3] = val2 & 0xFF;
 }
 
-void uint2char(uint16_t val, char *buf){
+void uint2char(uint16_t val, uint8_t *buf){
     buf[0] = (val >> 8) & 0xFF;
     buf[1] = val & 0xFF;
 }
 
-void Cmd_message::get_bytes(char *buf){
+void Cmd_message::get_bytes(uint8_t *buf){
     float2char(speed_ha, buf);
     float2char(speed_de, buf+4);
     float2char(power_ha, buf+8);
