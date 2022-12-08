@@ -300,9 +300,12 @@ bool Astroid::sendCommand()
         return false;
     }
 
+    tcdrain(PortFD);
+    usleep(10000);
+
 
     if(!ReadScopeStatus()){
-        LOG_DEBUG("CMD check first try failed");
+        LOG_INFO("CMD check first try failed, errno=%d");
         if(!ReadScopeStatus()){
             LOG_ERROR("CMD check failed: cannot read status after 2 tries");
             return false;
@@ -338,6 +341,8 @@ bool Astroid::sendCommand()
         return false;
     }
 
+    tcdrain(PortFD);
+    usleep(10000);
 
     if(!ReadScopeStatus()){
         LOG_DEBUG("CMD check first try failed");
