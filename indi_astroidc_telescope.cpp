@@ -325,7 +325,9 @@ bool Astroid::sendCommand()
 
 
     LOG_WARN("CMD check failed: incorrect return. Retrying");
-
+    usleep(10000);
+    tcflush(PortFD, TCIOFLUSH);
+    usleep(10000);
 
     errno = 0;
     nbytes_written = write(PortFD, cmd, 32);
