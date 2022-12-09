@@ -279,7 +279,8 @@ void Astroid::processGoto(){
     goto_active = !(ra_done && de_done);
     if(ra_done && de_done){
         EqNP.s = IPS_OK;
-        IDSetNumber(&EqNP, "Goto successful");
+        IDSetNumber(&EqNP, nullptr);
+        LOG_INFO("GOTO successful");
         goto_active = false;
     }
 
