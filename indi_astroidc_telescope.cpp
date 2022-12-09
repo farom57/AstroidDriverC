@@ -131,6 +131,7 @@ bool Astroid::Handshake()
     // 0.5s delay to let the device to initialize correctly
     usleep(500000);
     int err_count = 0;
+    LOG_INFO("debug: Connecting");
     while(err_count < 5){
 
         if(Astroid::ReadScopeStatus()){
@@ -279,8 +280,9 @@ bool Astroid::normalize_ra_de(double *ra, double *de){
 bool Astroid::sendCommand()
 {
     int nbytes_written = 0;
-    uint8_t cmd[32];
-    command.get_bytes(cmd);
+    //uint8_t cmd[32];
+    //command.get_bytes(cmd);
+    uint8_t cmd[]={0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00,0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x42};
     char hex_cmd[32 * 3 + 1] = {0};
 
     hexDump(hex_cmd, cmd, 32);
