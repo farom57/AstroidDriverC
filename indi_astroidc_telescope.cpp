@@ -328,7 +328,14 @@ bool Astroid::sendCommand()
         return true;
     }
 
-
+    LOGF_INFO("speed_ha: %f %f",command.speed_ha,last_status.move_speed_ha);
+    LOGF_INFO("speed_de: %f %f",command.speed_de,last_status.move_speed_de);
+    LOGF_INFO("speed_focus: %f %f",command.speed_focus,last_status.move_speed_focus);
+    LOGF_INFO("power_ha: %f %f",command.power_ha,last_status.power_ha);
+    LOGF_INFO("power_de: %f %f",command.power_de,last_status.power_de);
+    LOGF_INFO("power_aux_1: %f %f",command.power_aux_1,last_status.power_aux_1);
+    LOGF_INFO("power_aux_2: %f %f",command.power_aux_2,last_status.power_aux_2);
+    LOGF_INFO("power_aux_3: %f %f",command.power_aux_3,last_status.power_aux_3);
 
     LOG_WARN("CMD check failed: incorrect return. Retrying");
     usleep(10000);
