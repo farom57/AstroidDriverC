@@ -200,6 +200,27 @@ bool Astroid::ReadScopeStatus()
     fs_sexa(ra_str,ra,4,360000);
     LOGF_DEBUG("DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
 
+    _ra = ra;
+    _de = de;
+
+    normalize_ra_de(&ra, &de);
+
+    NewRaDec(ra, de);
+
+    processGoto();
+
+
+    return true;
+}
+
+
+
+void Astroid::processGoto(){
+
+    if(!goto_active){
+        return;
+    }
+
     /*
     char de_sync_str[20], ha_sync_str[20];
     fs_sexa(de_sync_str,sync_coord_DE,4,360000);
@@ -219,52 +240,53 @@ bool Astroid::ReadScopeStatus()
     dt  = tv.tv_sec - ltv.tv_sec + (tv.tv_usec - ltv.tv_usec) / 1e6;
     ltv = tv;
 
-    if(goto_active){
-        bool ra_done = false, de_done = false;
 
-        // DE
-        double distance_DE = goto_target_DE - de;
-        if (fabs(distance_DE) < GOTO_STOP_DISTANCE){
-            slew_DE_speed = 0;
-            de_done = true;
-        }else if(GOTO_ACC_T>0){
-            if (2*fabs(distance_DE)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_DE_speed*360./86400.)*(slew_DE_speed*360./86400.)){
-                slew_DE_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_DE > 0 ? 1 : -1);
-            }else{
-                slew_DE_speed = 86400./360.*sqrt(2*(fabs(distance_DE))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_DE > 0 ? 1 : -1);
-            }
-            slew_DE_speed = fmin(fmax(slew_DE_speed,-GOTO_SPEED),GOTO_SPEED);
-        }else{
-            slew_DE_speed = GOTO_SPEED*(distance_DE > 0 ? 1 : -1);
-        }
+    bool ra_done = false, de_done = false;
 
-        // RA
-        double distance_RA = (mod24(goto_target_RA - ra + 12) - 12)*15; // between -180 and 180
-        if (fabs(distance_RA) < GOTO_STOP_DISTANCE){
-            slew_RA_speed = 0;
-            ra_done=true;
-        }else if(GOTO_ACC_T>0){
-            if (2*fabs(distance_RA)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_RA_speed*360./86400.)*(slew_RA_speed*360./86400.)){
-                slew_RA_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_RA > 0 ? 1 : -1);
-            }else{
-                slew_RA_speed = 86400./360.*sqrt(2*(fabs(distance_RA))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_RA > 0 ? 1 : -1);
-            }
-            slew_RA_speed = fmin(fmax(slew_RA_speed,-GOTO_SPEED),GOTO_SPEED);
+    // DE
+    double distance_DE = goto_target_DE - _de;
+    if (fabs(distance_DE) < GOTO_STOP_DISTANCE){
+        slew_DE_speed = 0;
+        de_done = true;
+    }else if(GOTO_ACC_T>0){
+        if (2*fabs(distance_DE)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_DE_speed*360./86400.)*(slew_DE_speed*360./86400.)){
+            slew_DE_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_DE > 0 ? 1 : -1);
         }else{
-            slew_RA_speed = GOTO_SPEED*(distance_RA > 0 ? 1 : -1);
+            slew_DE_speed = 86400./360.*sqrt(2*(fabs(distance_DE))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_DE > 0 ? 1 : -1);
         }
-        LOGF_DEBUG("GOTO: dRA=%f sRA=%f dDE=%f sDE=%f", distance_RA,slew_RA_speed, distance_DE,slew_DE_speed);
-        goto_active = !(ra_done && de_done);
-        updateSpeed();
+        slew_DE_speed = fmin(fmax(slew_DE_speed,-GOTO_SPEED),GOTO_SPEED);
+    }else{
+        slew_DE_speed = GOTO_SPEED*(distance_DE > 0 ? 1 : -1);
     }
 
-    normalize_ra_de(&ra, &de);
+    // RA
+    double distance_RA = (mod24(goto_target_RA - _ra + 12) - 12)*15; // between -180 and 180
+    if (fabs(distance_RA) < GOTO_STOP_DISTANCE){
+        slew_RA_speed = 0;
+        ra_done=true;
+    }else if(GOTO_ACC_T>0){
+        if (2*fabs(distance_RA)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_RA_speed*360./86400.)*(slew_RA_speed*360./86400.)){
+            slew_RA_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_RA > 0 ? 1 : -1);
+        }else{
+            slew_RA_speed = 86400./360.*sqrt(2*(fabs(distance_RA))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_RA > 0 ? 1 : -1);
+        }
+        slew_RA_speed = fmin(fmax(slew_RA_speed,-GOTO_SPEED),GOTO_SPEED);
+    }else{
+        slew_RA_speed = GOTO_SPEED*(distance_RA > 0 ? 1 : -1);
+    }
+    LOGF_DEBUG("GOTO: dRA=%f sRA=%f dDE=%f sDE=%f", distance_RA,slew_RA_speed, distance_DE,slew_DE_speed);
 
-    NewRaDec(ra, de);
+    goto_active = !(ra_done && de_done);
+    if(ra_done && de_done){
+        EqNP.s = IPS_OK;
+        IDSetNumber(&EqNP, "Goto successful");
+        goto_active = false;
+    }
 
+    updateSpeed(false);
 
-    return true;
 }
+
 
 // Force de to be within -90..90 otherwise add +12h to ra and correct de. Return true if already in -90..90
 bool Astroid::normalize_ra_de(double *ra, double *de){
@@ -277,7 +299,7 @@ bool Astroid::normalize_ra_de(double *ra, double *de){
     return true;
 }
 
-bool Astroid::sendCommand()
+bool Astroid::sendCommand(bool ack)
 {
     int nbytes_written = 0;
     uint8_t cmd[32];
@@ -304,10 +326,13 @@ bool Astroid::sendCommand()
     }
 
     tcdrain(PortFD);
-    usleep(200000L);
+    usleep(10000);
     tcflush(PortFD, TCIOFLUSH);
     usleep(10000);
 
+    if(!ack){
+        return true;
+    }
 
     if(!ReadScopeStatus()){
         LOG_INFO("CMD check first try failed, errno=%d");
@@ -434,7 +459,7 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
     return INDI::Telescope::ISNewNumber(dev, name, values, names, n);
 }
 
-bool Astroid::updateSpeed(){
+bool Astroid::updateSpeed(bool ack){
 
     if(TrackState == SCOPE_SLEWING){
         switch(track_mode){
@@ -472,7 +497,7 @@ bool Astroid::updateSpeed(){
     command.power_de = power_DE;
 
 
-    if(!sendCommand()){
+    if(!sendCommand(ack)){
         TrackRateNP.s=IPS_ALERT;
         IDSetNumber(&TrackRateNP, "Failed to update the speed");
     }

@@ -57,6 +57,8 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
 
         virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
 
+
+
     protected:
         ///////////////////////////////////////////////////////////////////////////////
         /// Communication
@@ -73,8 +75,13 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
          */
         virtual bool ReadScopeStatus() override;
 
-        bool sendCommand();
-        bool updateSpeed();
+        /**
+         * @brief sendCommand Send the commanded state
+         * @param ack true if acknowledment is required
+         * @return true if successful, false otherwise.
+         */
+        bool sendCommand(bool ack = true);
+        bool updateSpeed(bool ack = true);
         Status_message last_status;
         Cmd_message command;
 
@@ -138,6 +145,7 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
 
 
 
+
     private:
         ///////////////////////////////////////////////////////////////////////////////
         /// Additional Properties
@@ -155,9 +163,9 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
         double goto_target_RA;
         double goto_target_DE;
         bool goto_active;
+        double _ra = 0, _de = 0; // it differs from indi angle in that if _de is outside of -90 -> 90 it indicates a different pier side
 
         double motion_speeds[4] = {1., 10., 50., 400};
-
 
         double track_speed_HA = 1.;
         double track_speed_DE = 0.;
@@ -179,6 +187,8 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
 
         void stopNSPulse();
         void stopWEPulse();
+
+        void processGoto();
 
 
         /////////////////////////////////////////////////////////////////////////////
