@@ -305,6 +305,8 @@ bool Astroid::sendCommand()
 
     tcdrain(PortFD);
     usleep(200000L);
+    tcflush(PortFD, TCIOFLUSH);
+    usleep(10000);
 
 
     if(!ReadScopeStatus()){
