@@ -304,7 +304,7 @@ bool Astroid::sendCommand()
     }
 
     tcdrain(PortFD);
-    usleep(10000);
+    usleep(50000);
 
 
     if(!ReadScopeStatus()){
@@ -333,9 +333,9 @@ bool Astroid::sendCommand()
     LOGF_INFO("speed_focus: %f %f",command.speed_focus,last_status.move_speed_focus);
     LOGF_INFO("power_ha: %f %f",command.power_ha,last_status.power_ha);
     LOGF_INFO("power_de: %f %f",command.power_de,last_status.power_de);
-    LOGF_INFO("power_aux_1: %f %f",command.power_aux_1,last_status.power_aux_1);
-    LOGF_INFO("power_aux_2: %f %f",command.power_aux_2,last_status.power_aux_2);
-    LOGF_INFO("power_aux_3: %f %f",command.power_aux_3,last_status.power_aux_3);
+    LOGF_INFO("power_aux_1: %d %d",command.power_aux_1,last_status.power_aux_1);
+    LOGF_INFO("power_aux_2: %d %d",command.power_aux_2,last_status.power_aux_2);
+    LOGF_INFO("power_aux_3: %d %d",command.power_aux_3,last_status.power_aux_3);
 
     LOG_WARN("CMD check failed: incorrect return. Retrying");
     usleep(10000);
