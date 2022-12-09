@@ -159,13 +159,13 @@ bool Astroid::ReadScopeStatus()
 
     uint8_t buf[200];
     int nbytes = 0, rc = 0;
-
+    LOG_INFO("debug: searching preamble");
     if ((rc = tty_read_section_expanded (PortFD, (char *)buf, 0x55,0, 100000, &nbytes)) != TTY_OK)
     {
         LOGF_WARN("Preamble not found, result: %d", rc);
         return false;
     }
-    LOGF_DEBUG("discarded %d bytes", nbytes);
+    LOGF_INFO("discarded %d bytes", nbytes);
 
     if ((rc = tty_read_expanded (PortFD, (char *)buf, Status_message::SIZE, 0, 5000, &nbytes)) != TTY_OK)
     {
