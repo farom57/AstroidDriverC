@@ -131,7 +131,7 @@ bool Astroid::Handshake()
     // 0.5s delay to let the device to initialize correctly
     usleep(500000);
     int err_count = 0;
-    LOG_INFO("debug: Connecting");
+
     while(err_count < 5){
 
         if(Astroid::ReadScopeStatus()){
@@ -159,13 +159,13 @@ bool Astroid::ReadScopeStatus()
 
     uint8_t buf[200];
     int nbytes = 0, rc = 0;
-    LOG_INFO("debug: searching preamble");
+
     if ((rc = tty_read_section_expanded (PortFD, (char *)buf, 0x55,0, 100000, &nbytes)) != TTY_OK)
     {
         LOGF_WARN("Preamble not found, result: %d", rc);
         return false;
     }
-    LOGF_INFO("discarded %d bytes", nbytes);
+    LOGF_DEBUG("discarded %d bytes", nbytes);
 
     if ((rc = tty_read_expanded (PortFD, (char *)buf, Status_message::SIZE, 0, 5000, &nbytes)) != TTY_OK)
     {
@@ -283,6 +283,7 @@ bool Astroid::sendCommand()
     //uint8_t cmd[32];
     //command.get_bytes(cmd);
     uint8_t cmd[]={0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00,0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x42};
+
     char hex_cmd[32 * 3 + 1] = {0};
 
     hexDump(hex_cmd, cmd, 32);
