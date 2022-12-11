@@ -79,9 +79,18 @@ bool Astroid::initProperties()
     AddTrackMode("TRACK_LUNAR", "Lunar");
     AddTrackMode("TRACK_CUSTOM", "Custom");
 
+    // Target Pier sidereal
+    IUFillSwitch(&TargetPierSideS[PIER_WEST], "PIER_WEST", "West (pointing east)", ISS_OFF);
+    IUFillSwitch(&TargetPierSideS[PIER_EAST], "PIER_EAST", "East (pointing west)", ISS_OFF);
+    IUFillSwitch(&TargetPierSideS[PIER_AUTO], "PIER_AUTO", "Auto", ISS_ON);
+    IUFillSwitch(&TargetPierSideS[PIER_CURRENT], "PIER_CURRENT", "Current", ISS_OFF);
+    IUFillSwitchVector(&TargetPierSideSP, TargetPierSideS, 4, getDeviceName(), "TARGET_PIER_SIDE", "Target Pier Side", MAIN_CONTROL_TAB,
+                       IP_RW, ISR_ATMOST1, 60, IPS_IDLE);
+
+
     // The mount is initially in SLEWING state.
     TrackState = SCOPE_SLEWING;
-    setPierSide(PIER_WEST);
+    setPierSide(PIER_EAST);
 
 
     // Let init the pulse guiding properties
@@ -95,7 +104,7 @@ bool Astroid::initProperties()
     setDriverInterface(getDriverInterface() | GUIDER_INTERFACE);
 
     // We want to query the mount every 100ms by default. The user can override this value.
-    setDefaultPollingPeriod(100);
+    setDefaultPollingPeriod(1000);
 
 
 
@@ -106,19 +115,21 @@ bool Astroid::updateProperties()
 {
     INDI::Telescope::updateProperties();
 
+
+
     if (isConnected())
     {
         defineProperty(&GuideNSNP);
         defineProperty(&GuideWENP);
         defineProperty(&GuideRateNP);
-
-
+        defineProperty(&TargetPierSideSP);
     }
     else
     {
         deleteProperty(GuideNSNP.name);
         deleteProperty(GuideWENP.name);
         deleteProperty(GuideRateNP.name);
+        deleteProperty(TargetPierSideSP.name);
     }
 
     return true;
@@ -138,7 +149,7 @@ bool Astroid::Handshake()
             LOG_INFO("Connection sucessful");
 
             // Reset sync
-            sync_coord_HA = get_local_sidereal_time(0.);    // assuming greenwich meridian
+            sync_coord_HA = get_local_sidereal_time(m_Location.longitude);
             sync_step_HA = 0;
             sync_coord_DE = 0;
             sync_step_DE = 0;
@@ -190,20 +201,31 @@ bool Astroid::ReadScopeStatus()
     }
 
 
-    double de = mod360((last_status.getDE() - sync_step_DE) / STEP_BY_TURN * 360. * (getPierSide() == PIER_EAST ? 1 : -1) + sync_coord_DE +90)-90;
+    double de = mod360((last_status.getDE() - sync_step_DE) / STEP_BY_TURN * 360. + sync_coord_DE +90)-90;
     double ha = mod24((last_status.getHA() - sync_step_HA) / STEP_BY_TURN * 24. + sync_coord_HA);
-    double ra = mod24(get_local_sidereal_time(0.)-ha);
+    double ra = mod24(get_local_sidereal_time(m_Location.longitude)-ha);
 
     char de_str[20], ha_str[20], ra_str[20];
     fs_sexa(de_str,de,4,360000);
     fs_sexa(ha_str,ha,4,360000);
     fs_sexa(ra_str,ra,4,360000);
-    LOGF_DEBUG("DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
+    LOGF_INFO("DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
 
     _ra = ra;
     _de = de;
 
-    normalize_ra_de(&ra, &de);
+    //normalize_ra_de(&ra, &de);
+    TelescopePierSide pier_side = (normalize_ra_de(&ra, &de) ? PIER_EAST : PIER_WEST);
+    setPierSide(pier_side);
+
+    fs_sexa(de_str,de,4,360000);
+    fs_sexa(ha_str,ha,4,360000);
+    fs_sexa(ra_str,ra,4,360000);
+    if(pier_side == PIER_WEST){
+        LOGF_INFO("--> West DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
+    }else{
+        LOGF_INFO("--> EAST DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
+    }
 
     NewRaDec(ra, de);
 
@@ -260,7 +282,10 @@ void Astroid::processGoto(){
     }
 
     // RA
-    double distance_RA = (mod24(goto_target_RA - _ra + 12) - 12)*15; // between -180 and 180
+    double target_HA = (goto_target_DE < 90 ? get_local_hour_angle(get_local_sidereal_time(m_Location.longitude),goto_target_RA) : get_local_hour_angle(get_local_sidereal_time(m_Location.longitude),goto_target_RA + 12));
+    double current_HA = (_de < 90 ? get_local_hour_angle(get_local_sidereal_time(m_Location.longitude),_ra) : get_local_hour_angle(get_local_sidereal_time(m_Location.longitude),_ra + 12));
+
+    double distance_RA = rangeHA(target_HA - current_HA) * -15; // between -180 and 180
     if (fabs(distance_RA) < GOTO_STOP_DISTANCE){
         slew_RA_speed = 0;
         ra_done=true;
@@ -409,26 +434,72 @@ bool Astroid::sendCommand(bool ack)
 
 bool Astroid::Goto(double RA, double DE)
 {
-    goto_target_RA = RA;
-    goto_target_DE = DE;
-    goto_active = true;
-    TrackState = SCOPE_SLEWING;
+    int target_pier_side = IUFindOnSwitchIndex(&TargetPierSideSP);
+
+    if(target_pier_side == PIER_AUTO){
+        target_pier_side = expectedPierSide(RA);
+    }
+    if(target_pier_side == PIER_CURRENT){
+        target_pier_side = getPierSide();
+    }
+    if(target_pier_side == PIER_UNKNOWN){
+        target_pier_side = PIER_WEST;
+    }
+
+    normalize_ra_de(&RA, &DE);
 
     char RAStr[20]={0}, DecStr[20]={0};
     fs_sexa(RAStr, RA, 2, 3600);
     fs_sexa(DecStr, DE, 2, 3600);
-    LOGF_INFO("Slewing to RA: %s - DEC: %s", RAStr, DecStr);
+
+    if(target_pier_side == PIER_WEST){
+        goto_target_RA = RA;
+        goto_target_DE = DE;
+        LOGF_INFO("Slewing to:  RA %s - DEC %s - Pier West", RAStr, DecStr);
+    }else{
+        goto_target_RA = range24(RA + 12);
+        goto_target_DE = 180. - DE;
+        LOGF_INFO("Slewing to:  RA %s - DEC %s - Pier East", RAStr, DecStr);
+    }
+
+    goto_active = true;
+    TrackState = SCOPE_SLEWING;
 
     return true;
 }
 
 bool Astroid::Sync(double RA, double DE)
 {
+    int target_pier_side = IUFindOnSwitchIndex(&TargetPierSideSP);
+
+    if(target_pier_side == PIER_AUTO){
+        target_pier_side = expectedPierSide(RA);
+    }
+    if(target_pier_side == PIER_CURRENT){
+        target_pier_side = getPierSide();
+    }
+    if(target_pier_side == PIER_UNKNOWN){
+        target_pier_side = PIER_WEST;
+    }
+
     normalize_ra_de(&RA, &DE);
+
+
+    char RAStr[20]={0}, DecStr[20]={0};
+    fs_sexa(RAStr, RA, 2, 3600);
+    fs_sexa(DecStr, DE, 2, 3600);
+
     sync_step_HA = last_status.getHA();
     sync_step_DE = last_status.getDE();
-    sync_coord_HA = mod24(get_local_sidereal_time(0.) - RA);
-    sync_coord_DE = DE;
+    if(target_pier_side == PIER_WEST){
+        sync_coord_HA = range24(get_local_sidereal_time(m_Location.longitude) - RA);
+        sync_coord_DE = DE;
+        LOGF_INFO("Sync to:  RA %s - DEC %s - Pier West", RAStr, DecStr);
+    }else{
+        sync_coord_HA = range24(get_local_sidereal_time(m_Location.longitude) - RA + 12);
+        sync_coord_DE = 180. - DE;
+        LOGF_INFO("Sync to:  RA %s - DEC %s - Pier East", RAStr, DecStr);
+    }
 
     return true;
 }
@@ -459,6 +530,22 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
     // Otherwise, send it up the chains to INDI::Telescope to process any further properties
     return INDI::Telescope::ISNewNumber(dev, name, values, names, n);
 }
+
+/*bool Astroid::ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n){
+
+    if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
+    {
+        //  This one is for us
+        if (!strcmp(name, TargetPierSideSP.name)){
+            TargetPierSideSP.s = IPS_OK;
+            IUUpdateSwitch(&TargetPierSideSP, states, names, n);
+            //  Update client display
+            IDSetSwitch(&TargetPierSideSP, nullptr);
+            return true;
+        }
+    }
+    return ISNewSwitch(dev, name, states, names, n);
+}*/
 
 bool Astroid::updateSpeed(bool ack){
 

@@ -56,6 +56,7 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
         virtual bool updateProperties() override;
 
         virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
+        //virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
 
 
 
@@ -152,6 +153,11 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
         ///////////////////////////////////////////////////////////////////////////////
         INumber GuideRateN[2];
         INumberVectorProperty GuideRateNP;
+
+        ISwitch TargetPierSideS[4];
+        ISwitchVectorProperty TargetPierSideSP;
+        static const int PIER_AUTO = 2;
+        static const int PIER_CURRENT = 3;
 
         ///////////////////////////////////////////////////////////////////////////////
         /// Class Variables
