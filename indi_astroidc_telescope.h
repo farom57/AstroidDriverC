@@ -27,9 +27,9 @@
 #define GOTO_STOP_DISTANCE (1. / 60.)
 #define GOTO_SLOW_DISTANCE (15. / 60.)
 #define MAX_SPEED (623*2)
-#define GOTO_SPEED 400
-#define GOTO_ACC_T 5
-#define GOTO_SLOW_SPEED GOTO_SPEED/10
+#define GOTO_SPEED 400.
+#define GOTO_ACC_T 5.
+#define GOTO_SLOW_SPEED GOTO_SPEED/10.
 
 /**
  * @brief The MountDriver class provides a simple example for development of a new

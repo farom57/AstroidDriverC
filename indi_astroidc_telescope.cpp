@@ -44,7 +44,7 @@ Astroid::Astroid()
     // Set capabilities supported by the mount.
     // The last parameters is the number of slew rates available.
     SetTelescopeCapability(TELESCOPE_CAN_SYNC | TELESCOPE_CAN_GOTO | TELESCOPE_CAN_ABORT | TELESCOPE_HAS_PIER_SIDE |
-                           TELESCOPE_HAS_TIME | TELESCOPE_HAS_TRACK_MODE | TELESCOPE_CAN_CONTROL_TRACK | TELESCOPE_HAS_TRACK_RATE,
+                           TELESCOPE_HAS_TIME | TELESCOPE_HAS_TRACK_MODE | TELESCOPE_CAN_CONTROL_TRACK | TELESCOPE_HAS_TRACK_RATE | TELESCOPE_HAS_LOCATION,
                            4);
     setTelescopeConnection(CONNECTION_SERIAL);
 }
@@ -209,22 +209,22 @@ bool Astroid::ReadScopeStatus()
     fs_sexa(de_str,de,4,360000);
     fs_sexa(ha_str,ha,4,360000);
     fs_sexa(ra_str,ra,4,360000);
-    LOGF_INFO("DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
+    LOGF_DEBUG("DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
 
     _ra = ra;
     _de = de;
 
     //normalize_ra_de(&ra, &de);
-    TelescopePierSide pier_side = (normalize_ra_de(&ra, &de) ? PIER_EAST : PIER_WEST);
+    TelescopePierSide pier_side = (normalize_ra_de(&ra, &de) ? PIER_WEST : PIER_EAST);
     setPierSide(pier_side);
 
     fs_sexa(de_str,de,4,360000);
     fs_sexa(ha_str,ha,4,360000);
     fs_sexa(ra_str,ra,4,360000);
     if(pier_side == PIER_WEST){
-        LOGF_INFO("--> West DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
+        LOGF_DEBUG("--> Pier West (pointing east) DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
     }else{
-        LOGF_INFO("--> EAST DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
+        LOGF_DEBUG("--> Pier East (pointing west) DE:%s HA:%s RA:%s", de_str,ha_str,ra_str);
     }
 
     NewRaDec(ra, de);
@@ -282,14 +282,26 @@ void Astroid::processGoto(){
     }
 
     // RA
-    double target_HA = (goto_target_DE < 90 ? get_local_hour_angle(get_local_sidereal_time(m_Location.longitude),goto_target_RA) : get_local_hour_angle(get_local_sidereal_time(m_Location.longitude),goto_target_RA + 12));
-    double current_HA = (_de < 90 ? get_local_hour_angle(get_local_sidereal_time(m_Location.longitude),_ra) : get_local_hour_angle(get_local_sidereal_time(m_Location.longitude),_ra + 12));
+    double lst = get_local_sidereal_time(m_Location.longitude);
+    double target_HA, current_HA;
+    //if(goto_target_DE < 90.){
+        target_HA = rangeHA(lst - goto_target_RA);
+    //    LOGF_INFO("goto_target_DE=%f < 90 target_HA=rangeHA(lst - goto_target_RA)=%f lst=%f goto_target_RA=%f",goto_target_DE,target_HA,lst,goto_target_RA);
+    //}else{
+    //    target_HA = rangeHA(lst - goto_target_RA + 12.);
+    //    LOGF_INFO("goto_target_DE=%f >= 90 target_HA=rangeHA(lst - goto_target_RA + 12.)=%f lst=%f goto_target_RA=%f",goto_target_DE,target_HA,lst,goto_target_RA);
+    //}
+    //if(_de < 90.){
+        current_HA = rangeHA(lst - _ra);
+    //}else{
+        current_HA = rangeHA(lst - _ra + 12.);
+    //}
 
-    double distance_RA = rangeHA(target_HA - current_HA) * -15; // between -180 and 180
+    double distance_RA = rangeHA(target_HA - current_HA) * 15.; // between -180 and 180
     if (fabs(distance_RA) < GOTO_STOP_DISTANCE){
         slew_RA_speed = 0;
         ra_done=true;
-    }else if(GOTO_ACC_T>0){
+    }else if(GOTO_ACC_T>0.){
         if (2*fabs(distance_RA)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_RA_speed*360./86400.)*(slew_RA_speed*360./86400.)){
             slew_RA_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_RA > 0 ? 1 : -1);
         }else{
@@ -299,7 +311,7 @@ void Astroid::processGoto(){
     }else{
         slew_RA_speed = GOTO_SPEED*(distance_RA > 0 ? 1 : -1);
     }
-    LOGF_DEBUG("GOTO: dRA=%f sRA=%f dDE=%f sDE=%f", distance_RA,slew_RA_speed, distance_DE,slew_DE_speed);
+    LOGF_INFO("GOTO: dRA=%f sRA=%f dDE=%f sDE=%f tHA=%F cHA=%f tDE=%f cDE=%f lst=%f tRA=%f cRA=%f", distance_RA,slew_RA_speed, distance_DE,slew_DE_speed,target_HA,current_HA, goto_target_DE, _de, lst,goto_target_RA, _ra);
 
     goto_active = !(ra_done && de_done);
     if(ra_done && de_done){
@@ -474,6 +486,8 @@ bool Astroid::Sync(double RA, double DE)
 
     if(target_pier_side == PIER_AUTO){
         target_pier_side = expectedPierSide(RA);
+        LOGF_INFO("Syncing to RA %f autodetected PIER %d", RA, target_pier_side);
+        LOGF_INFO("get_local_sidereal_time: %f m_Location.longitude%: %f get_local_hour_angle(lst, ra): %f", get_local_sidereal_time(m_Location.longitude), m_Location.longitude, get_local_hour_angle(get_local_sidereal_time(m_Location.longitude), RA));
     }
     if(target_pier_side == PIER_CURRENT){
         target_pier_side = getPierSide();
@@ -576,7 +590,7 @@ bool Astroid::updateSpeed(bool ack){
         track_speed_DE = 0;
     }
 
-    double speed_DE = (track_speed_DE+slew_DE_speed) * (getPierSide() == PIER_EAST ? 1 : -1);
+    double speed_DE = (track_speed_DE+slew_DE_speed);
     double speed_HA = track_speed_HA-slew_RA_speed;
 
     command.speed_ha = speed_HA;
@@ -612,7 +626,7 @@ bool Astroid::Abort()
 bool Astroid::MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command)
 {
     if(command==MOTION_START){
-        slew_DE_speed = (dir == DIRECTION_NORTH ? 1.: -1.) * motion_speeds[IUFindOnSwitchIndex(&SlewRateSP)];
+        slew_DE_speed = (dir == DIRECTION_NORTH ? -1.: 1.) * motion_speeds[IUFindOnSwitchIndex(&SlewRateSP)] * (getPierSide() == PIER_EAST ? 1 : -1);
     }else{ // MOTION_STOP
         slew_DE_speed = 0;
     }
@@ -641,7 +655,7 @@ IPState Astroid::GuideNorth(uint32_t ms)
         GuideNSTID = 0;
     }
 
-    slew_DE_speed = GuideRateN[AXIS_DE].value;
+    slew_DE_speed = GuideRateN[AXIS_DE].value * (getPierSide() == PIER_EAST ? 1 : -1);
 
     if (!updateSpeed())
         return IPS_ALERT;
@@ -660,7 +674,7 @@ IPState Astroid::GuideSouth(uint32_t ms)
         GuideNSTID = 0;
     }
 
-    slew_DE_speed = -GuideRateN[AXIS_DE].value;
+    slew_DE_speed = -GuideRateN[AXIS_DE].value * (getPierSide() == PIER_EAST ? 1 : -1);
 
     if (!updateSpeed())
         return IPS_ALERT;
