@@ -27,9 +27,10 @@
 
 #define GOTO_STOP_DISTANCE 10./3600. // 10 arcsec
 #define GOTO_SLOW_DISTANCE 3. // 3 deg
+#define GOTO_SLOW_SPEED 5 // TODO define as funct of refresh rate
 #define MAX_SPEED (623*2)
 #define GOTO_SPEED 400.
-#define GOTO_SLOW_SPEED GOTO_SPEED/10.
+
 
 /**
  * @brief The MountDriver class provides a simple example for development of a new

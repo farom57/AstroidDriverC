@@ -270,10 +270,8 @@ void Astroid::processGoto(){
     if (fabs(distance_DE) < GOTO_STOP_DISTANCE){
         slew_DE_speed = 0;
         de_done = true;
-    }else if(fabs(distance_DE) < GOTO_STOP_DISTANCE){
-        slew_DE_speed = GOTO_SPEED*distance_DE/GOTO_SLOW_DISTANCE;
     }else{
-        slew_DE_speed = GOTO_SPEED*(distance_DE > 0 ? 1 : -1);
+        slew_DE_speed = GOTO_SPEED*(distance_DE > 0 ? 1 : -1)*fmax(GOTO_SLOW_SPEED,fmin(GOTO_SPEED,fabs(distance_DE)/GOTO_SLOW_DISTANCE));
     }
 
     // RA
@@ -289,17 +287,15 @@ void Astroid::processGoto(){
     //if(_de < 90.){
         current_HA = rangeHA(lst - _ra);
     //}else{
-        current_HA = rangeHA(lst - _ra + 12.);
+    //    current_HA = rangeHA(lst - _ra + 12.);
     //}
 
-    double distance_RA = rangeHA(target_HA - current_HA) * 15.; // between -180 and 180
+    double distance_RA = rangeHA(target_HA - current_HA) * -15.; // between -180 and 180
     if (fabs(distance_RA) < GOTO_STOP_DISTANCE){
         slew_RA_speed = 0;
         ra_done=true;
-    }else if(fabs(distance_RA) < GOTO_SLOW_DISTANCE){
-        slew_RA_speed = GOTO_SPEED*distance_RA/GOTO_SLOW_DISTANCE;
     }else{
-        slew_RA_speed = GOTO_SPEED*(distance_RA > 0 ? 1 : -1);
+        slew_RA_speed = GOTO_SPEED*(distance_RA > 0 ? 1 : -1)*fmax(GOTO_SLOW_SPEED,fmin(GOTO_SPEED,fabs(distance_RA)/GOTO_SLOW_DISTANCE));
     }
     LOGF_INFO("GOTO: dRA=%f sRA=%f dDE=%f sDE=%f tHA=%F cHA=%f tDE=%f cDE=%f lst=%f tRA=%f cRA=%f", distance_RA,slew_RA_speed, distance_DE,slew_DE_speed,target_HA,current_HA, goto_target_DE, _de, lst,goto_target_RA, _ra);
 
