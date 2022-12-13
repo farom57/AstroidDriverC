@@ -24,11 +24,11 @@
 #include "libastro.h"
 
 #define STEP_BY_TURN (50. * 3. * 144.)
-#define GOTO_STOP_DISTANCE (1. / 60.)
-#define GOTO_SLOW_DISTANCE (15. / 60.)
+
+#define GOTO_STOP_DISTANCE 10./3600. // 10 arcsec
+#define GOTO_SLOW_DISTANCE 3. // 3 deg
 #define MAX_SPEED (623*2)
 #define GOTO_SPEED 400.
-#define GOTO_ACC_T 5.
 #define GOTO_SLOW_SPEED GOTO_SPEED/10.
 
 /**

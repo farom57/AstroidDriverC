@@ -270,13 +270,8 @@ void Astroid::processGoto(){
     if (fabs(distance_DE) < GOTO_STOP_DISTANCE){
         slew_DE_speed = 0;
         de_done = true;
-    }else if(GOTO_ACC_T>0){
-        if (2*fabs(distance_DE)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_DE_speed*360./86400.)*(slew_DE_speed*360./86400.)){
-            slew_DE_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_DE > 0 ? 1 : -1);
-        }else{
-            slew_DE_speed = 86400./360.*sqrt(2*(fabs(distance_DE))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_DE > 0 ? 1 : -1);
-        }
-        slew_DE_speed = fmin(fmax(slew_DE_speed,-GOTO_SPEED),GOTO_SPEED);
+    }else if(fabs(distance_DE) < GOTO_STOP_DISTANCE){
+        slew_DE_speed = GOTO_SPEED*distance_DE/GOTO_SLOW_DISTANCE;
     }else{
         slew_DE_speed = GOTO_SPEED*(distance_DE > 0 ? 1 : -1);
     }
@@ -301,13 +296,8 @@ void Astroid::processGoto(){
     if (fabs(distance_RA) < GOTO_STOP_DISTANCE){
         slew_RA_speed = 0;
         ra_done=true;
-    }else if(GOTO_ACC_T>0.){
-        if (2*fabs(distance_RA)*(GOTO_SPEED*15./3600./GOTO_ACC_T)>(slew_RA_speed*360./86400.)*(slew_RA_speed*360./86400.)){
-            slew_RA_speed += GOTO_SPEED/GOTO_ACC_T *dt* (distance_RA > 0 ? 1 : -1);
-        }else{
-            slew_RA_speed = 86400./360.*sqrt(2*(fabs(distance_RA))*(GOTO_SPEED*15./3600./GOTO_ACC_T))*(distance_RA > 0 ? 1 : -1);
-        }
-        slew_RA_speed = fmin(fmax(slew_RA_speed,-GOTO_SPEED),GOTO_SPEED);
+    }else if(fabs(distance_RA) < GOTO_SLOW_DISTANCE){
+        slew_RA_speed = GOTO_SPEED*distance_RA/GOTO_SLOW_DISTANCE;
     }else{
         slew_RA_speed = GOTO_SPEED*(distance_RA > 0 ? 1 : -1);
     }
