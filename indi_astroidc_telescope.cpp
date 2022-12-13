@@ -271,7 +271,7 @@ void Astroid::processGoto(){
         slew_DE_speed = 0;
         de_done = true;
     }else{
-        slew_DE_speed = GOTO_SPEED*(distance_DE > 0 ? 1 : -1)*fmax(GOTO_SLOW_SPEED,fmin(GOTO_SPEED,fabs(distance_DE)/GOTO_SLOW_DISTANCE));
+        slew_DE_speed = (distance_DE > 0 ? 1 : -1)*fmax(GOTO_SLOW_SPEED,fmin(GOTO_SPEED,GOTO_SPEED*fabs(distance_DE)/GOTO_SLOW_DISTANCE));
     }
 
     // RA
@@ -295,7 +295,7 @@ void Astroid::processGoto(){
         slew_RA_speed = 0;
         ra_done=true;
     }else{
-        slew_RA_speed = GOTO_SPEED*(distance_RA > 0 ? 1 : -1)*fmax(GOTO_SLOW_SPEED,fmin(GOTO_SPEED,fabs(distance_RA)/GOTO_SLOW_DISTANCE));
+        slew_RA_speed = (distance_RA > 0 ? 1 : -1)*fmax(GOTO_SLOW_SPEED,fmin(GOTO_SPEED,GOTO_SPEED*fabs(distance_RA)/GOTO_SLOW_DISTANCE));
     }
     LOGF_INFO("GOTO: dRA=%f sRA=%f dDE=%f sDE=%f tHA=%F cHA=%f tDE=%f cDE=%f lst=%f tRA=%f cRA=%f", distance_RA,slew_RA_speed, distance_DE,slew_DE_speed,target_HA,current_HA, goto_target_DE, _de, lst,goto_target_RA, _ra);
 
