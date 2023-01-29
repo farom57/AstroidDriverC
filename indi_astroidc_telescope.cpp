@@ -891,7 +891,7 @@ void Astroid::stopFocusPulseHelper(void *p)
 void Astroid::stopFocusPulse(){
     slew_focus_speed = 0;
     if(updateSpeed()){
-        FI::FocusTimerNP.s = IPS_IDLE;
+        FI::FocusTimerNP.s = IPS_OK;
         LOG_DEBUG("Focus stopped.");
     }else{
         FI::FocusTimerNP.s = IPS_ALERT;
