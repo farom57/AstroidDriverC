@@ -154,6 +154,8 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
         ///////////////////////////////////////////////////////////////////////////////
         INumber GuideRateN[2];
         INumberVectorProperty GuideRateNP;
+        INumber AuxN[3];
+        INumberVectorProperty AuxNP;
 
         ISwitch TargetPierSideS[4];
         ISwitchVectorProperty TargetPierSideSP;
@@ -191,6 +193,10 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
 
         int GuideNSTID { -1 };
         int GuideWETID { -1 };
+
+        ///////////////////////////////////////////////////////////////////////////////
+        /// Class Functions
+        ///////////////////////////////////////////////////////////////////////////////
 
         void stopNSPulse();
         void stopWEPulse();

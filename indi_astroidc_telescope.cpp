@@ -88,8 +88,14 @@ bool Astroid::initProperties()
                        IP_RW, ISR_ATMOST1, 60, IPS_IDLE);
 
 
-    // The mount is initially in SLEWING state.
-    TrackState = SCOPE_SLEWING;
+    // Aux port for light or heaters
+    IUFillNumber(&AuxN[0], "AUX_1", "1 / red", "%d", 0, 255, 1, 0);
+    IUFillNumber(&AuxN[1], "AUX_2", "2 / blue", "%d", 0, 255, 1, 0);
+    IUFillNumber(&AuxN[2], "AUX_3", "3 / green", "%d", 0, 255, 1, 0);
+    IUFillNumberVector(&AuxNP, AuxN, 3, getDeviceName(), "AUX", "Aux", "Aux", IP_RW, 0, IPS_IDLE);
+
+    // The mount is initially in TRACKING state.
+    TrackState = SCOPE_TRACKING;
     setPierSide(PIER_EAST);
 
 
@@ -123,6 +129,7 @@ bool Astroid::updateProperties()
         defineProperty(&GuideWENP);
         defineProperty(&GuideRateNP);
         defineProperty(&TargetPierSideSP);
+        defineProperty(&AuxNP);
     }
     else
     {
@@ -130,6 +137,7 @@ bool Astroid::updateProperties()
         deleteProperty(GuideWENP.name);
         deleteProperty(GuideRateNP.name);
         deleteProperty(TargetPierSideSP.name);
+        deleteProperty(AuxNP.name);
     }
 
     return true;
@@ -523,6 +531,25 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
         if (strcmp(name, GuideNSNP.name) == 0 || strcmp(name, GuideWENP.name) == 0)
         {
             processGuiderProperties(name, values, names, n);
+            return true;
+        }
+
+        // Aux
+        if (strcmp(name, AuxNP.name) == 0)
+        {
+            IUUpdateNumber(&AuxNP, values, names, n);
+            AuxNP.s = IPS_BUSY;
+            IDSetNumber(&AuxNP, nullptr);
+            command.power_aux_1 = AuxN[0].value;
+            command.power_aux_2 = AuxN[1].value;
+            command.power_aux_3 = AuxN[2].value;
+            if(!sendCommand(ack)){
+                AuxNP.s=IPS_ALERT;
+                IDSetNumber(&AuxNP, "Failed to update the aux");
+            }else{
+                AuxNP.s=((AuxN[0].value==0 && AuxN[0].value==0 && AuxN[0].value==0) ? IPS_IDLE : IPS_OK);
+                IDSetNumber(&AuxNP, nullptr);
+            }
             return true;
         }
     }
