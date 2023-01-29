@@ -593,7 +593,7 @@ bool Astroid::ISNewSwitch(const char *dev, const char *name, ISState *states, ch
 
 bool Astroid::updateSpeed(bool ack){
 
-    if(TrackState == SCOPE_SLEWING){
+    if(TrackState == SCOPE_SLEWING || TrackState == SCOPE_TRACKING){
         switch(track_mode){
             case TRACK_SIDEREAL:
                 track_speed_HA = 1;
