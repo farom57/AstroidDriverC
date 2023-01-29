@@ -112,8 +112,8 @@ bool Astroid::initProperties()
     // Add debug controls
     addDebugControl();
 
-    // Set the driver interface to indicate that we can also do pulse guiding
-    setDriverInterface(getDriverInterface() | GUIDER_INTERFACE);
+    // Set the driver interface to indicate that we can also do pulse guiding & focus
+    setDriverInterface(getDriverInterface() | GUIDER_INTERFACE | FOCUSER_INTERFACE);
 
     // We want to query the mount every 100ms by default. The user can override this value.
     setDefaultPollingPeriod(1000);
