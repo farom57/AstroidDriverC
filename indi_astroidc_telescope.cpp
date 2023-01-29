@@ -89,9 +89,9 @@ bool Astroid::initProperties()
 
 
     // Aux port for light or heaters
-    IUFillNumber(&AuxN[0], "AUX_1", "1 / red", "%d", 0, 255, 1, 0);
-    IUFillNumber(&AuxN[1], "AUX_2", "2 / blue", "%d", 0, 255, 1, 0);
-    IUFillNumber(&AuxN[2], "AUX_3", "3 / green", "%d", 0, 255, 1, 0);
+    IUFillNumber(&AuxN[0], "AUX_1", "1 / red", "%f", 0., 255., 1., 0.);
+    IUFillNumber(&AuxN[1], "AUX_2", "2 / blue", "%f", 0., 255., 1., 0.);
+    IUFillNumber(&AuxN[2], "AUX_3", "3 / green", "%f", 0., 255., 1., 0.);
     IUFillNumberVector(&AuxNP, AuxN, 3, getDeviceName(), "AUX", "Aux", "Aux", IP_RW, 0, IPS_IDLE);
 
     // The mount is initially in TRACKING state.
@@ -540,9 +540,9 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
             IUUpdateNumber(&AuxNP, values, names, n);
             AuxNP.s = IPS_BUSY;
             IDSetNumber(&AuxNP, nullptr);
-            command.power_aux_1 = AuxN[0].value;
-            command.power_aux_2 = AuxN[1].value;
-            command.power_aux_3 = AuxN[2].value;
+            command.power_aux_1 = (uint16_t)AuxN[0].value;
+            command.power_aux_2 = (uint16_t)AuxN[1].value;
+            command.power_aux_3 = (uint16_t)AuxN[2].value;
             if(!sendCommand(true)){
                 AuxNP.s=IPS_ALERT;
                 IDSetNumber(&AuxNP, "Failed to update the aux");
