@@ -540,9 +540,11 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
             IUUpdateNumber(&AuxNP, values, names, n);
             AuxNP.s = IPS_BUSY;
             IDSetNumber(&AuxNP, nullptr);
+
             command.power_aux_1 = (uint16_t)AuxN[0].value;
             command.power_aux_2 = (uint16_t)AuxN[1].value;
             command.power_aux_3 = (uint16_t)AuxN[2].value;
+            LOGF_INFO("AUX: %f %f %f / %d %d %d",AuxN[0].value,AuxN[1].value,AuxN[2].value,command.power_aux_1,command.power_aux_2,command.power_aux_3);
             if(!sendCommand(true)){
                 AuxNP.s=IPS_ALERT;
                 IDSetNumber(&AuxNP, "Failed to update the aux");
