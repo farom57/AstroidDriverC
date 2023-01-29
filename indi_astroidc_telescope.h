@@ -19,6 +19,7 @@
 #pragma once
 
 #include "indiguiderinterface.h"
+#include "indifocuserinterface.h"
 #include "inditelescope.h"
 #include "messages.h"
 #include "libastro.h"
@@ -47,7 +48,7 @@
  *
  * @author Jasem Mutlaq
  */
-class Astroid : public INDI::Telescope, public INDI::GuiderInterface
+class Astroid : public INDI::Telescope, public INDI::GuiderInterface, public INDI::FocuserInterface
 {
     public:
         Astroid();
@@ -57,7 +58,7 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface
         virtual bool updateProperties() override;
 
         virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
-        //virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
+        virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
 
 
 

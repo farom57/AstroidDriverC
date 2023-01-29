@@ -36,8 +36,10 @@
 // Single unique pointer to the driver.
 static std::unique_ptr<Astroid> telescope_sim(new Astroid());
 
-Astroid::Astroid()
+Astroid::Astroid() : FI(this)
 {
+
+
     // Let's specify the driver version
     setVersion(1, 0);
 
@@ -47,6 +49,9 @@ Astroid::Astroid()
                            TELESCOPE_HAS_TIME | TELESCOPE_HAS_TRACK_MODE | TELESCOPE_CAN_CONTROL_TRACK | TELESCOPE_HAS_TRACK_RATE | TELESCOPE_HAS_LOCATION,
                            4);
     setTelescopeConnection(CONNECTION_SERIAL);
+
+    // Set focusercapabilities
+    SetCapability(FOCUSER_CAN_REL_MOVE | FOCUSER_CAN_ABORT | FOCUSER_HAS_VARIABLE_SPEED);
 }
 
 const char *Astroid::getDefaultName()
@@ -58,6 +63,7 @@ bool Astroid::initProperties()
 {
     // Make sure to init parent properties first
     INDI::Telescope::initProperties();
+    FI::initProperties(FOCUS_TAB);
 
     // How fast do we guide compared to sidereal rate
     IUFillNumber(&GuideRateN[AXIS_RA], "GUIDE_RATE_WE", "W/E Rate", "%.1f", 0, 10, 0.1, 0.5);
@@ -120,7 +126,7 @@ bool Astroid::initProperties()
 bool Astroid::updateProperties()
 {
     INDI::Telescope::updateProperties();
-
+    INDI::FocuserInterface::updateProperties();
 
 
     if (isConnected())
@@ -260,15 +266,16 @@ void Astroid::processGoto(){
     LOGF_INFO("sync_step_HA:%f last_status.getHA():%f sync_coord_HA:%s", sync_step_HA, last_status.getHA(), ha_sync_str);
     LOGF_INFO("step_ha:%d ustep_ha:%f last_status.getHA():%f",last_status.step_ha, last_status.ustep_ha, last_status.getHA());*/
 
-    static struct timeval ltv { 0, 0 };
+    /*static struct timeval ltv { 0, 0 };
     struct timeval tv { 0, 0 };
-    double dt = 0;
-    /* update elapsed time since last poll, don't presume exactly POLLMS */
+    double dt;
+    // update elapsed time since last poll, don't presume exactly POLLMS
     gettimeofday(&tv, nullptr);
     if (ltv.tv_sec == 0 && ltv.tv_usec == 0)
         ltv = tv;
+
     dt  = tv.tv_sec - ltv.tv_sec + (tv.tv_usec - ltv.tv_usec) / 1e6;
-    ltv = tv;
+    ltv = tv;*/
 
 
     bool ra_done = false, de_done = false;
@@ -556,13 +563,16 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
             LOGF_INFO("read_back: %d %d %d", last_status.power_aux_1, last_status.power_aux_2, last_status.power_aux_3);
             return true;
         }
+        // FOCUSER_CAN_ABORT
+        if (strstr(name, "FOCUS_"))
+             return INDI::FocuserInterface::processNumber(dev, name, values, names, n);
     }
 
     // Otherwise, send it up the chains to INDI::Telescope to process any further properties
     return INDI::Telescope::ISNewNumber(dev, name, values, names, n);
 }
 
-/*bool Astroid::ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n){
+bool Astroid::ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n){
 
     if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
     {
@@ -574,9 +584,12 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
             IDSetSwitch(&TargetPierSideSP, nullptr);
             return true;
         }
+        if (strstr(name, "FOCUS_"))
+             return INDI::FocuserInterface::processSwitch(dev, name, states, names, n);
     }
-    return ISNewSwitch(dev, name, states, names, n);
-}*/
+
+    return INDI::Telescope::ISNewSwitch(dev, name, states, names, n);
+}
 
 bool Astroid::updateSpeed(bool ack){
 
