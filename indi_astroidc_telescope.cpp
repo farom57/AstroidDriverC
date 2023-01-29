@@ -89,9 +89,9 @@ bool Astroid::initProperties()
 
 
     // Aux port for light or heaters
-    IUFillNumber(&AuxN[0], "AUX_1", "1 / red", "%f", 0., 255., 1., 0.);
-    IUFillNumber(&AuxN[1], "AUX_2", "2 / blue", "%f", 0., 255., 1., 0.);
-    IUFillNumber(&AuxN[2], "AUX_3", "3 / green", "%f", 0., 255., 1., 0.);
+    IUFillNumber(&AuxN[0], "AUX_1", "1 / red", "%.0f", 0., 255., 1., 0.);
+    IUFillNumber(&AuxN[1], "AUX_2", "2 / blue", "%.0f", 0., 255., 1., 0.);
+    IUFillNumber(&AuxN[2], "AUX_3", "3 / green", "%.0f", 0., 255., 1., 0.);
     IUFillNumberVector(&AuxNP, AuxN, 3, getDeviceName(), "AUX", "Aux", "Aux", IP_RW, 0, IPS_IDLE);
 
     // The mount is initially in TRACKING state.
@@ -552,6 +552,8 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
                 AuxNP.s=((AuxN[0].value==0 && AuxN[0].value==0 && AuxN[0].value==0) ? IPS_IDLE : IPS_OK);
                 IDSetNumber(&AuxNP, nullptr);
             }
+            ReadScopeStatus();
+            LOGF_INFO("read_back: %d %d %d", last_status.power_aux_1, last_status.power_aux_2, last_status.power_aux_3);
             return true;
         }
     }
