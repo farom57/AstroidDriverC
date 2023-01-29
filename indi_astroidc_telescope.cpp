@@ -543,7 +543,7 @@ bool Astroid::ISNewNumber(const char *dev, const char *name, double values[], ch
             command.power_aux_1 = AuxN[0].value;
             command.power_aux_2 = AuxN[1].value;
             command.power_aux_3 = AuxN[2].value;
-            if(!sendCommand(ack)){
+            if(!sendCommand(true)){
                 AuxNP.s=IPS_ALERT;
                 IDSetNumber(&AuxNP, "Failed to update the aux");
             }else{
