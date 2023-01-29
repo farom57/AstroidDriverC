@@ -136,6 +136,15 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface, public IND
         virtual bool Goto(double RA, double DE) override;
         virtual bool Sync(double RA, double DE) override;
 
+        ///////////////////////////////////////////////////////////////////////////////
+        /// Focus Commands
+        ///////////////////////////////////////////////////////////////////////////////
+        bool SetFocuserSpeed(int speed);
+        IPState MoveFocuser(FocusDirection dir, int speed, uint16_t duration);
+        IPState MoveRelFocuser(FocusDirection dir, uint32_t ticks);
+        //bool ReverseFocuser(bool enabled);
+        bool AbortFocuser();
+
 
         /**
          * @brief hexDump Helper function to print non-string commands to the logger so it is easier to debug
@@ -176,6 +185,7 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface, public IND
         double _ra = 0, _de = 0; // it differs from indi angle in that if _de is outside of -90 -> 90 it indicates a different pier side
 
         double motion_speeds[4] = {1., 10., 50., 400};
+        double focus_speed = 1.;
 
         double track_speed_HA = 1.;
         double track_speed_DE = 0.;
@@ -187,13 +197,18 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface, public IND
 
         double slew_DE_speed = 0;
         double slew_RA_speed = 0;
-        double slew_FOCUS_speed = 0;
+        double slew_focus_speed = 0;
+
         double power_HA = 1;
         double power_DE = 1;
         double power_FOCUS = 1;
 
+
+
+
         int GuideNSTID { -1 };
         int GuideWETID { -1 };
+        int FocusTID { -1 };
 
         ///////////////////////////////////////////////////////////////////////////////
         /// Class Functions
@@ -201,7 +216,7 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface, public IND
 
         void stopNSPulse();
         void stopWEPulse();
-
+        void stopFocusPulse();
         void processGoto();
 
 
@@ -213,4 +228,5 @@ class Astroid : public INDI::Telescope, public INDI::GuiderInterface, public IND
         static bool normalize_ra_de(double *ra, double *de);
         static void stopNSPulseHelper(void *p);
         static void stopWEPulseHelper(void *p);
+        static void stopFocusPulseHelper(void *p);
 };

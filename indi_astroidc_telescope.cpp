@@ -51,7 +51,7 @@ Astroid::Astroid() : FI(this)
     setTelescopeConnection(CONNECTION_SERIAL);
 
     // Set focusercapabilities
-    SetCapability(FOCUSER_CAN_REL_MOVE | FOCUSER_CAN_ABORT | FOCUSER_HAS_VARIABLE_SPEED);
+    SetCapability(FOCUSER_CAN_REL_MOVE | FOCUSER_CAN_ABORT | FOCUSER_HAS_VARIABLE_SPEED | FOCUSER_CAN_REVERSE);
 }
 
 const char *Astroid::getDefaultName()
@@ -627,7 +627,8 @@ bool Astroid::updateSpeed(bool ack){
     command.speed_de = speed_DE;
     command.power_ha = power_HA;
     command.power_de = power_DE;
-
+    command.speed_focus = slew_focus_speed;
+    command.power_focus = power_FOCUS;
 
     if(!sendCommand(ack)){
         TrackRateNP.s=IPS_ALERT;
@@ -840,4 +841,65 @@ double Astroid::mod24(double x) {
     double res = fmod(x,24.);
     res += (res < 0 ? 24. : 0);
     return res;
+}
+
+bool Astroid::SetFocuserSpeed(int speed){
+    focus_speed = speed;
+    return updateSpeed(true);
+}
+
+
+IPState Astroid::MoveFocuser(FocusDirection dir, int speed, uint16_t duration)
+{
+    // NOTE: This is needed if we don't specify FOCUSER_CAN_ABS_MOVE
+    // TODO: Actual code to move the focuser. You can use IEAddTimer to do a
+    // callback after "duration" to stop your focuser.
+    LOGF_INFO("MoveFocuser: %d %d %d", dir, speed, duration);
+
+    if (FocusTID)
+    {
+        IERmTimer(FocusTID);
+        FocusTID = 0;
+    }
+
+    slew_focus_speed = (dir == FOCUS_INWARD ? 1 : -1) * speed;
+
+    if (!updateSpeed())
+        return IPS_ALERT;
+
+    FocusTID = IEAddTimer(static_cast<int>(duration), stopFocusPulseHelper, this);
+    return IPS_BUSY;
+}
+
+IPState Astroid::MoveRelFocuser(FocusDirection dir, uint32_t ticks)
+{
+
+    return MoveFocuser(dir, focus_speed, ticks/focus_speed);
+}
+
+bool Astroid::AbortFocuser()
+{
+    slew_focus_speed = 0;
+    return updateSpeed(true);
+}
+
+void Astroid::stopFocusPulseHelper(void *p)
+{
+    static_cast<Astroid *>(p)->stopFocusPulse();
+}
+
+void Astroid::stopFocusPulse(){
+    slew_focus_speed = 0;
+    if(updateSpeed()){
+        FI::FocusTimerNP.s = IPS_IDLE;
+        LOG_DEBUG("Focus stopped.");
+    }else{
+        FI::FocusTimerNP.s = IPS_ALERT;
+        LOG_ERROR("Failed to stop Focus.");
+    }
+
+    FocusTID = 0;
+    FI::FocusTimerNP.np[0].value = 0;
+    FI::FocusTimerNP.np[1].value = 0;
+    IDSetNumber(&(FI::FocusTimerNP), nullptr);
 }
