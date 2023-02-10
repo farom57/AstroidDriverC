@@ -896,6 +896,7 @@ void Astroid::stopFocusPulse(){
     slew_focus_speed = 0;
     if(updateSpeed()){
         FI::FocusTimerNP.s = IPS_OK;
+        FI::FocusRelPosNP.s = IPS_OK;
         LOG_DEBUG("Focus stopped.");
     }else{
         FI::FocusTimerNP.s = IPS_ALERT;
@@ -904,6 +905,7 @@ void Astroid::stopFocusPulse(){
 
     FocusTID = 0;
     FI::FocusTimerNP.np[0].value = 0;
-    FI::FocusTimerNP.np[1].value = 0;
+    FI::FocusRelPosNP.np[0].value = 0;
     IDSetNumber(&(FI::FocusTimerNP), nullptr);
+    IDSetNumber(&(FI::FocusRelPosNP), nullptr);
 }
