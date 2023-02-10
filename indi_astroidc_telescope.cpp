@@ -65,6 +65,8 @@ bool Astroid::initProperties()
     INDI::Telescope::initProperties();
     FI::initProperties(FOCUS_TAB);
 
+    FI::FocusSpeedN[0].value = 50;
+
     // How fast do we guide compared to sidereal rate
     IUFillNumber(&GuideRateN[AXIS_RA], "GUIDE_RATE_WE", "W/E Rate", "%.1f", 0, 10, 0.1, 0.5);
     IUFillNumber(&GuideRateN[AXIS_DE], "GUIDE_RATE_NS", "N/S Rate", "%.1f", 0, 10, 0.1, 0.5);
@@ -320,6 +322,7 @@ void Astroid::processGoto(){
         IDSetNumber(&EqNP, nullptr);
         LOG_INFO("GOTO successful");
         goto_active = false;
+        TrackState = SCOPE_TRACKING;
     }
 
     updateSpeed(false);
@@ -650,6 +653,7 @@ bool Astroid::Abort()
     slew_RA_speed = 0;
     track_speed_DE = 0;
     track_speed_HA = fmax(fmin(1,track_speed_HA),0); // clip between 0 and 1
+    TrackState = SCOPE_TRACKING;
 
     return updateSpeed();
 }
@@ -805,7 +809,7 @@ bool Astroid::SetTrackMode(uint8_t mode)
 
 bool Astroid::SetTrackEnabled(bool enabled)
 {
-    TrackState = (enabled ? SCOPE_SLEWING : SCOPE_IDLE);
+    TrackState = (enabled ? SCOPE_TRACKING : SCOPE_IDLE);
 
     return updateSpeed();
 }
